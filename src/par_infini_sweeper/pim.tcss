@@ -1,0 +1,18 @@
+
+MainGrid {
+    background: #1e1e1e;
+    color: #c5c8c6;
+    border: solid #444444;
+    padding: 0;
+    width: 1fr;
+    height: 1fr;
+}
+
+Screen {
+    background: #121212;
+}
+
+#info {
+    height: 1;
+    width: 1fr;
+}

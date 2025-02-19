@@ -1,0 +1,117 @@
+[project]
+name = "par_infini_sweeper"
+dynamic = [
+    "version",
+]
+description = "Par Infinite Minesweeper"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [
+    { name = "Paul Robello", email = "probello@gmail.com" },
+]
+maintainers = [
+    { name = "Paul Robello", email = "probello@gmail.com" },
+]
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Environment :: Console",
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: End Users/Desktop",
+    "Intended Audience :: Other Audience",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows :: Windows 10",
+    "Operating System :: Microsoft :: Windows :: Windows 11",
+    "Operating System :: POSIX :: Linux",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Typing :: Typed",
+]
+keywords = [
+    "tui",
+    "minesweeper",
+]
+dependencies = [
+    "asyncio>=3.4.3",
+    "pydantic-core>=2.27.2",
+    "pydantic>=2.10.6",
+    "python-dotenv>=1.0.1",
+    "requests>=2.32.3",
+    "rich>=13.9.4",
+    "orjson>=3.10.15",
+    "typer>=0.15.1",
+    "textual>=2.0.3",
+]
+packages = [
+    "src/par_infini_sweeper",
+]
+
+[project.license]
+file = "LICENSE"
+
+[project.urls]
+Homepage = "https://github.com/paulrobello/par_infini_sweeper"
+Documentation = "https://github.com/paulrobello/par_infini_sweeper/blob/main/README.md"
+Repository = "https://github.com/paulrobello/par_infini_sweeper"
+Issues = "https://github.com/paulrobello/par_infini_sweeper/issues"
+Discussions = "https://github.com/paulrobello/par_infini_sweeper/discussions"
+Wiki = "https://github.com/paulrobello/par_infini_sweeper/wiki"
+
+[project.scripts]
+pim = "par_infini_sweeper.__main__:app"
+
+[build-system]
+requires = [
+    "hatchling",
+    "wheel",
+]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "build>=1.2.1",
+    "twine>=6.1.0",
+    "pyright>=1.1.379",
+    "pre-commit>=4.1.0",
+    "ruff>=0.9.3",
+    "pyinstrument>=5.0.1",
+    "ruff>=0.7.0",
+    "types-orjson>=3.6.2",
+]
+
+[tool.hatch.version]
+path = "src/par_infini_sweeper/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = [
+    "src/par_infini_sweeper",
+]
+include = [
+    "py.typed",
+    "**/*.py",
+    "**/*.html",
+    "**/*.gif",
+    "**/*.jpg",
+    "**/*.png",
+    "**/*.md",
+    "**/*.tcss",
+]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "src/par_infini_sweeper",
+    "LICENSE",
+    "README.md",
+    "extraction_prompt.md",
+    "pyproject.toml",
+]
+exclude = [
+    "*.pyc",
+    "__pycache__",
+    "*.so",
+    "*.dylib",
+]
