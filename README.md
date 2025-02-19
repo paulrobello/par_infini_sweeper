@@ -4,7 +4,7 @@
 
 Infinite Minesweeper TUI. Play a game of minesweeper with infinite board size!
 
-![Par Infinite Minesweeper](./Screenshot.png)
+![Par Infinite Minesweeper](https://raw.githubusercontent.com/paulrobello/par_infini_sweeper/main/Screenshot.png)
 
 ## Technology
 - Python
@@ -48,14 +48,29 @@ Your score is the number of solved sub grids times the difficulty level.
 ## Prerequisites
 
 ## Installation
+
+### PyPi
 ```shell
 uv tool install par_infini_sweeper
 ```
 
+### GitHub
+```shell
+uv tool install git+https://github.com/paulrobello/par_infini_sweeper
+```
+
 ## Update
+
+### PyPi
 ```shell
 uv tool install par_infini_sweeper -U --force
 ```
+
+### GitHub
+```shell
+uv tool install git+https://github.com/paulrobello/par_infini_sweeper -U --force
+```
+
 
 ## Installed Usage
 ```shell
@@ -69,6 +84,7 @@ uv run pim [OPTIONS]
 
 
 ### CLI Options
+- `-s`, `--server`: Start webserver that allows app to be played in a browser              
 - `-h`, `--help`: Show this help message and exit
 - `--version`, `-v`: Print version information and exit
 
@@ -80,6 +96,8 @@ uv run pim [OPTIONS]
 
 ## Whats New
 
+- Version 0.2.0:
+  - Added webserver to play in a browser
 - Version 0.1.0:
   - Initial release
 
