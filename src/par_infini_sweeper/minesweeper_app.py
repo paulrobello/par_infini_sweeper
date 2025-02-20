@@ -54,9 +54,8 @@ class MinesweeperApp(App):
         super().__init__(**kwargs)
         self.info = Static("Info", id="info")
         self.debug_panel = Static("Debug", id="debug")
-        self.game_state = GameState.load(user_name, nickname)
+        self.game_state = GameState.load(None, user_name, nickname)
         self.sweeper_widget = MainGrid(self.game_state, self.info, self.debug_panel)
-
 
     def compose(self) -> ComposeResult:
         yield Header()

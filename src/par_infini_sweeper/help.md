@@ -12,13 +12,14 @@ Shift or Ctrl + Left-click to toggle flagging a covered cell as a mine. On an un
 Drag to pan the board.  
   
 Keys:  
-* `F1` help.
-* `N` new game.
-* `O` move view to origin.
-* `C` move view to board center (computed as center of exposed sub grids).
-* `H` highscores.
-* `T` change theme.
-* `Q` quit game.
+* `F1` Help.
+* `N` New game.
+* `O` Move view to origin.
+* `C` Move view to board center (computed as center of exposed sub grids).
+* `P` Pause.
+* `H` Highscores.
+* `T` Change theme.
+* `Q` Quit.
 
 ## Scoring
 

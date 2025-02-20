@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from rich.console import ConsoleRenderable, RichCast
 from rich.text import TextType
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Center, Vertical
 from textual.screen import ModalScreen
+from textual.visual import SupportsVisual
 from textual.widgets import Button, Static
 from textual.widgets._button import ButtonVariant
 
@@ -48,7 +50,7 @@ class TextDialog(ModalScreen[None]):
         Binding("escape", "dismiss(None)", "", show=False),
     ]
 
-    def __init__(self, title: TextType, message: TextType) -> None:
+    def __init__(self, title: TextType, message: ConsoleRenderable | RichCast | str | SupportsVisual) -> None:  # noqa: F821
         """Initialise the dialog."""
         super().__init__()
         self._title = title

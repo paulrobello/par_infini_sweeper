@@ -23,13 +23,14 @@ Sub grids can only be unlocked when cells neighboring the sub grid are uncovered
 Shift or Ctrl + Left-click to toggle flagging a covered cell as a mine. On an uncovered cell it will uncover all neighboring cells. As a safety you must have same number of flags as mines in the neighboring cells.  
 Drag to pan the board.  
 Keys:  
-* `F1` help.
-* `N` new game.
-* `O` move view to origin.
-* `C` move view to board center (computed as center of exposed sub grids).
-* `H` highscores.
-* `T` change theme.
-* `Q` quit game.
+* `F1` Help.
+* `N` New game.
+* `O` Move view to origin.
+* `C` Move view to board center (computed as center of exposed sub grids).
+* `P` Pause.
+* `H` Highscores.
+* `T` Change theme.
+* `Q` Quit.
 
 ## Scoring
 
@@ -42,8 +43,13 @@ Depending the difficulty level, the number of mines in each sub grid will vary.
 When all cells that are not mines in a sub grid are uncovered the sub grid is marked solved and flags are placed on any mines that are not already flagged.  
 Your score is the sum of all mines in the solved sub grids.  
 
+## Settings
+
+All data for the application is stored in a sqlite3 database located in `~/.pim/game_data.sqlite`
 
 ## Prerequisites
+
+The instructions assume you have `uv` installed.
 
 ## Installation
 
@@ -72,7 +78,7 @@ uv tool install git+https://github.com/paulrobello/par_infini_sweeper -U --force
 
 ## Installed Usage
 ```shell
-par_infini_sweeper [OPTIONS]
+pim [OPTIONS]
 ```
 
 ## From source Usage
@@ -86,15 +92,22 @@ uv run pim [OPTIONS]
 --server              -s            Start webserver that allows app to be played in a browser
 --user                -u      TEXT  User name to use [default: logged in username]
 --nick                -n      TEXT  Set user nickname [default: None]
---version             -v
+--version             -v            Show version and exit.
 --help                              Show this message and exit.
 ```
 
 ## Roadmap
 
+- Global Leaderboard
+- More game modes
 - Optimize for more performance
 
 ## Whats New
+- Version 0.2.7:
+  - Added pause key `p`
+  - Fixed bug where sometimes newly generated sub grids would not get saved if no cells were uncovered 
+  - More optimizations
+  - Support for future game modes
 - Version 0.2.6:
   - Now only highlights unrevealed surrounding cells when shift/ctrl + left-click on uncovered cells 
 - Version 0.2.6:
@@ -113,6 +126,10 @@ uv run pim [OPTIONS]
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
+
+## Shoutout
+
+I would like to thank [Edward Jazzhands](http://edward-jazzhands.github.io/) for all his help testing and providing feedback / feature requests!
 
 ## License
 

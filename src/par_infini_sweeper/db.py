@@ -1,17 +1,24 @@
 import sqlite3
 from pathlib import Path
-from sqlite3 import Connection
+from sqlite3 import Connection, Cursor
 from typing import Any
 
 from par_infini_sweeper import __application_binary__
-from par_infini_sweeper.enums import GameDifficulty
+from par_infini_sweeper.db_migrations import migrate_legacy_db
+from par_infini_sweeper.enums import GameDifficulty, GameMode
+
+db_folder = Path(f"~/.{__application_binary__}").expanduser()
+db_path = db_folder / "game_data.sqlite"
+db_bak_path = db_folder / "game_data.sqlite.bak"
 
 
 def get_db_connection() -> sqlite3.Connection:
-    """Return a connection to the SQLite database with a 10 sec timeout."""
-    db_path = Path(f"~/.{__application_binary__}").expanduser() / "game_data.sqlite"
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(db_path, timeout=10)
+    """Return a connection to the SQLite database with a 5 sec timeout."""
+    db_folder.mkdir(parents=True, exist_ok=True)
+    if not db_bak_path.exists():
+        db_bak_path.write_bytes(db_path.read_bytes())
+
+    conn = sqlite3.connect(db_path, timeout=5)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -29,11 +36,35 @@ def init_db(conn: Connection, username: str = "user", nickname: str | None = Non
     conn = conn or get_db_connection()
     with conn:
         cursor = conn.cursor()
+
+        # Check if pim_db_info and users tables exist
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='pim_db_info'")
+        pim_db_info_exists = cursor.fetchone() is not None
+
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")
+        users_exists = cursor.fetchone() is not None
+
+        # If users table exists but pim_db_info does not, run migrate_db
+        if users_exists and not pim_db_info_exists:
+            migrate_legacy_db(conn)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS pim_db_info (
+                version TEXT PRIMARY KEY
+            )
+        """)
+        cursor.execute("SELECT version FROM pim_db_info")
+        db_version = cursor.fetchone()
+        if db_version is None:
+            db_version = "1.0"
+            cursor.execute("INSERT INTO pim_db_info (version) VALUES (?)", (db_version,))
+
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT UNIQUE NOT NULL,
-                nickname TEXT UNIQUE NOT NULL
+                nickname TEXT UNIQUE NOT NULL,
+                created_ts TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
         cursor.execute("""
@@ -41,17 +72,19 @@ def init_db(conn: Connection, username: str = "user", nickname: str | None = Non
                 id INTEGER PRIMARY KEY,
                 theme TEXT NOT NULL,
                 difficulty TEXT NOT NULL CHECK(difficulty IN ('easy','medium','hard')),
-                FOREIGN KEY(id) REFERENCES users(id)
+                FOREIGN KEY(id) REFERENCES users(id) ON DELETE CASCADE
             )
         """)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS games (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL,
+                game_mode TEXT NOT NULL DEFAULT 'infinite',
                 game_over BOOLEAN NOT NULL DEFAULT 0,
                 play_duration INTEGER NOT NULL DEFAULT 0,
                 board_offset TEXT NOT NULL DEFAULT '0,0',
-                FOREIGN KEY(user_id) REFERENCES users(id)
+                created_ts TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
             )
         """)
         cursor.execute("""
@@ -61,8 +94,8 @@ def init_db(conn: Connection, username: str = "user", nickname: str | None = Non
                 game_id INTEGER NOT NULL,
                 score INTEGER NOT NULL,
                 created_ts TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY(user_id) REFERENCES users(id)
-                FOREIGN KEY(game_id) REFERENCES games(id)
+                FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY(game_id) REFERENCES games(id) ON DELETE CASCADE
             )
         """)
         cursor.execute("""
@@ -71,8 +104,8 @@ def init_db(conn: Connection, username: str = "user", nickname: str | None = Non
                 user_id INTEGER NOT NULL,
                 sub_grid_id TEXT NOT NULL,
                 grid_data TEXT NOT NULL,
-                FOREIGN KEY(user_id) REFERENCES users(id),
-                FOREIGN KEY(game_id) REFERENCES games(id),
+                FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY(game_id) REFERENCES games(id) ON DELETE CASCADE,
                 PRIMARY KEY (game_id, user_id, sub_grid_id)
             )
         """)
@@ -90,14 +123,24 @@ def init_db(conn: Connection, username: str = "user", nickname: str | None = Non
 
 
 def get_user(conn: Connection, username: str = "user", nickname: str | None = None) -> dict[str, Any]:
-    """Load default user."""
-    cursor = conn.cursor()
+    """
+    Load or create requested user.
+
+    Args:
+        conn (Connection): SQLite connection object.
+        username (str): Username to load or create.
+        nickname (str | None): Nickname to load or create.
+
+    Returns:
+        dict[str, Any]: User data including preferences and game state.
+
+    """
+    cursor: Cursor = conn.cursor()
     cursor.execute("SELECT * FROM users WHERE username = ?", (username,))
     user = dict(cursor.fetchone())
     if user is None:
         # If default user not found, initialize the DB.
         init_db(conn, username, nickname)
-        cursor = conn.cursor()
         cursor.execute("SELECT id FROM users WHERE username = ?", ("user",))
         user = dict(cursor.fetchone())
     else:
@@ -117,7 +160,7 @@ def get_user(conn: Connection, username: str = "user", nickname: str | None = No
     cursor.execute(
         "SELECT * FROM highscores WHERE game_id=? AND user_id = ? order by created_ts limit 10",
         (
-            user["game"]["id"],
+            game["id"],
             user_id,
         ),
     )
@@ -127,15 +170,55 @@ def get_user(conn: Connection, username: str = "user", nickname: str | None = No
     return user
 
 
-def get_highscores() -> list[dict[str, Any]]:
-    """Return top 10 highscores."""
+def get_highscores(num_scores: int = 10) -> dict[GameMode, list[dict[str, Any]]]:
+    """
+    Return top num_scores highscores for each game_mode.
+
+    Args:
+        num_scores (int): Number of top scores to return for each game mode.
+
+    Returns:
+        dict[GameMode,list[dict[str, Any]]]: List of top 10 highscore records for each game mode
+
+    """
+    if num_scores < 1:
+        raise ValueError("num_scores must be at least 1")
     with get_db_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute("""
-        SELECT score, created_ts, u.nickname
-        FROM highscores h
-        JOIN users u ON h.user_id = u.id
-        ORDER BY score DESC, created_ts DESC LIMIT 10
-        """)
+        cursor.execute(
+            """
+        WITH RankedScores AS (
+            SELECT
+                score,
+                h.created_ts,
+                u.nickname,
+                g.game_mode,
+                g.play_duration,
+                ROW_NUMBER() OVER (PARTITION BY g.game_mode ORDER BY score DESC, h.created_ts DESC) as rank
+            FROM highscores h
+            JOIN users u ON h.user_id = u.id
+            JOIN games g ON g.id = h.game_id
+        )
+        SELECT
+            score,
+            created_ts,
+            nickname,
+            game_mode,
+            play_duration
+        FROM RankedScores
+        WHERE rank <= ?
+        ORDER BY game_mode, rank;
+        """,
+            (num_scores,),
+        )
         highscores = cursor.fetchall()
-        return [dict(s) for s in highscores]
+        highscores = [dict(s) for s in highscores]
+        result: dict[GameMode, list[dict[str, Any]]] = {}
+        for gm in GameMode:
+            result[gm] = []
+        for h in highscores:
+            if h["game_mode"] not in result:
+                result[GameMode(h["game_mode"])] = []
+
+            result[GameMode(h["game_mode"])].append(h)
+        return result
