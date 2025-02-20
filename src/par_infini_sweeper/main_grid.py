@@ -33,7 +33,7 @@ class MainGrid(Widget, can_focus=True):
         self.drag_start: tuple[int, int] | None = None
         self.drag_threshold: int = 2  # minimal cells to distinguish a drag from a click
         self.is_dragging: bool = False
-        self.debug = True
+        self.debug = False
         self.xray = False
         self.debug_panel.display = self.debug
 
