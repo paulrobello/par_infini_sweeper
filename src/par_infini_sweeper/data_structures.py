@@ -264,7 +264,7 @@ class GameState:
 
     def score(self) -> int:
         """Calculate the score based on the number of solved subgrids and difficulty."""
-        return self.num_solved * difficulty_mult.get(self.difficulty, 1)
+        return self.num_solved * mine_counts.get(self.difficulty, 8)
 
     def save_score(self) -> None:
         score = self.score()

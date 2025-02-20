@@ -8,7 +8,7 @@ from textual.widget import Widget
 from textual.widgets import Static
 
 from par_infini_sweeper import db
-from par_infini_sweeper.data_structures import Cell, GameState, SubGrid, mine_counts
+from par_infini_sweeper.data_structures import Cell, GameState, SubGrid
 from par_infini_sweeper.dialogs.information import InformationDialog
 
 
@@ -169,9 +169,12 @@ class MainGrid(Widget, can_focus=True):
                 ny: int = gy + dy
                 n_sg: tuple[int, int] = (nx // 8, ny // 8)
                 if n_sg not in self.game_state.subgrids:
-                    if self.debug:
-                        continue
-                    self.game_state.subgrids[n_sg] = SubGrid(n_sg, self.game_state.difficulty)
+                    continue
+                    # if self.debug:
+                    #     continue
+                    # sg = SubGrid(n_sg, self.game_state.difficulty)
+                    # sg.changed = True
+                    # self.game_state.subgrids[n_sg] = sg
                 subgrid: SubGrid = self.game_state.subgrids[n_sg]
                 lx: int = nx % 8
                 ly: int = ny % 8
@@ -228,7 +231,7 @@ class MainGrid(Widget, can_focus=True):
                 if cell.is_mine and not cell.marked:
                     cell.marked = True
 
-    def reveal_cell(self, gx: int, gy: int, surrounding: bool = False, depth: int = 0) -> None:
+    def reveal_cell(self, gx: int, gy: int, depth: int = 0) -> None:
         """
         Reveal the cell at global coordinates (gx, gy). If it is a mine the game ends. Also, generate any adjacent subgrids as needed.
 
@@ -252,14 +255,13 @@ class MainGrid(Widget, can_focus=True):
             self.game_state.subgrids[sg_coord] = SubGrid(sg_coord, self.game_state.difficulty)
         subgrid: SubGrid = self.game_state.subgrids[sg_coord]
         cell: Cell = subgrid.cells[local_y][local_x]
-        # Do nothing if cell is marked
-        if cell.marked:
-            return
-        if cell.uncovered and not surrounding:
+        # Do nothing if cell is marked or uncovered.
+        if cell.marked or cell.uncovered:
             return
 
+        # Uncover the cell only if we are not in reveal surrounding mode
         cell.uncovered = True
-        if cell.is_mine:
+        if cell.uncovered and cell.is_mine:
             self.game_state.game_over = True
             self.game_state.save()
             self.game_state.save_score()
@@ -287,8 +289,34 @@ class MainGrid(Widget, can_focus=True):
                     ny: int = gy + dy
                     # Prevent infinite recursion by limiting depth.
                     if depth < 250:
-                        self.reveal_cell(nx, ny, False, depth + 1)
-        if depth == 0 and surrounding:
+                        self.reveal_cell(nx, ny, depth + 1)
+        self.check_subgrid_solved(sg_coord)
+
+    def reveal_surround(self, gx: int, gy: int) -> None:
+        """
+        Reveal surrounding cells if the cell at (gx, gy) is uncovered and the number of flagged cells matches the number of mines.
+
+        Args:
+            gx (int): The global x-coordinate of the cell
+            gy (int): The global y-coordinate of the cell
+
+        """
+        if self.game_state.game_over:
+            return
+        sg_coord: tuple[int, int] = (gx // 8, gy // 8)
+        if sg_coord not in self.game_state.subgrids:
+            return
+        subgrid: SubGrid = self.game_state.subgrids[sg_coord]
+        local_x: int = gx % 8
+        local_y: int = gy % 8
+        cell: Cell = subgrid.cells[local_y][local_x]
+        if not cell.uncovered:
+            return
+        counts: tuple[int, int] = self.count_adjacent_flags_mines(gx, gy)
+        if not counts[0]:
+            self.notify("No flagged cells", severity="warning")
+            return
+        if cell.uncovered:
             if counts[0] != counts[1]:
                 self.notify("Flag count does not match mine count", severity="error")
             else:
@@ -298,9 +326,7 @@ class MainGrid(Widget, can_focus=True):
                             continue
                         nx: int = gx + dx
                         ny: int = gy + dy
-                        self.reveal_cell(nx, ny, False, depth + 1)
-
-        self.check_subgrid_solved(sg_coord)
+                        self.reveal_cell(nx, ny)
 
     def toggle_mark(self, gx: int, gy: int) -> None:
         """
@@ -314,7 +340,8 @@ class MainGrid(Widget, can_focus=True):
         local_x: int = gx % 8
         local_y: int = gy % 8
         if sg_coord not in self.game_state.subgrids:
-            self.game_state.subgrids[sg_coord] = SubGrid(sg_coord, self.game_state.difficulty)
+            return
+            # self.game_state.subgrids[sg_coord] = SubGrid(sg_coord, self.game_state.difficulty)
         subgrid: SubGrid = self.game_state.subgrids[sg_coord]
         cell: Cell = subgrid.cells[local_y][local_x]
         if cell.uncovered:
@@ -344,7 +371,7 @@ class MainGrid(Widget, can_focus=True):
         elif (event.button == 2 and not event.shift) or (event.button == 1 and event.shift):
             self.toggle_mark(gx, gy)
         elif event.button == 2 and event.shift:
-            self.reveal_cell(gx, gy, True)
+            self.reveal_surround(gx, gy)
 
     def adjust_mouse_pos(self, event: MouseEvent) -> None:
         """

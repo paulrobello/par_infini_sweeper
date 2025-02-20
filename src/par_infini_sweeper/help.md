@@ -25,12 +25,9 @@ Keys:
 
 The main grid consists of 8x8 sub grids.  
 Depending the difficulty level, the number of mines in each sub grid will vary.  
-* Easy: 5 mines
-* Medium: 10 mines
-* Hard: 15 mines
+* Easy: 8 mines
+* Medium: 12 mines
+* Hard: 16 mines
 
 When all cells that are not mines in a sub grid are uncovered the sub grid is marked solved and flags are placed on any mines that are not already flagged.  
-Your score is the number of solved sub grids times the difficulty level.  
-* Easy: x1
-* Medium: x2
-* Hard: x3
+Your score is the sum of all mines in the solved sub grids.  

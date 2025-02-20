@@ -63,6 +63,7 @@ class MinesweeperApp(App):
 
     def on_mount(self) -> None:
         self.theme = self.game_state.theme
+        self.sweeper_widget.focus()
 
     @work
     async def action_change_theme(self) -> None:

@@ -119,7 +119,7 @@ def get_highscores() -> list[dict[str, Any]]:
     with get_db_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
-        SELECT score, created_ts, u.nickname 
+        SELECT score, created_ts, u.nickname
         FROM highscores h
         JOIN users u ON h.user_id = u.id
         ORDER BY score DESC, created_ts DESC LIMIT 10
