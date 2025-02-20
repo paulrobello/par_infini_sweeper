@@ -90,8 +90,3 @@ class MinesweeperApp(App):
         self.game_state.difficulty = difficulty
         self.game_state.new_game()
         self.sweeper_widget.action_center()
-
-
-if __name__ == "__main__":
-    sweeper_app: MinesweeperApp = MinesweeperApp()
-    sweeper_app.run()

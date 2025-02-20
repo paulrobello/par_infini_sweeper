@@ -24,6 +24,7 @@ class Cell:
         self._marked: bool = marked
         self._uncovered: bool = uncovered
         self._changed: bool = False
+        self._highlighted: bool = False
 
     @property
     def is_mine(self) -> bool:
@@ -56,6 +57,22 @@ class Cell:
             self.changed = True
 
     @property
+    def highlighted(self) -> bool:
+        return self._highlighted
+
+    @highlighted.setter
+    def highlighted(self, value: bool) -> None:
+        if self._highlighted != value:
+            self._highlighted = value
+            self.parent.parent.highlighted_cells.add(self) if value else self.parent.parent.highlighted_cells.discard(
+                self
+            )
+
+    @property
+    def parent(self) -> SubGrid:
+        return self._parent
+
+    @property
     def changed(self) -> bool:
         return self._changed
 
@@ -80,16 +97,42 @@ class SubGrid:
     """Represents an 8×8 subgrid of cells."""
 
     def __init__(
-        self, pos: tuple[int, int], difficulty: GameDifficulty | None = None, safe_pos: tuple[int, int] | None = None
+        self,
+        parent: GameState,
+        pos: tuple[int, int],
+        difficulty: GameDifficulty | None = None,
+        safe_pos: tuple[int, int] | None = None,
     ) -> None:
         """
         Initialize a subgrid at position `pos` with the given difficulty.
         Optionally ensure that the cell at local coordinate safe_pos is mine‑free.
+
+        Args:
+            parent (GameState): The parent game state.
+            pos (tuple[int, int]): The position of the subgrid.
+            difficulty (GameDifficulty | None): The difficulty level of the game.
+            safe_pos (tuple[int, int] | None): A cell that is guaranteed to be mine-free.
         """
-        self.changed: bool = False
+        self._changed: bool = False
         self.pos: tuple[int, int] = pos
         self.cells: list[list[Cell]] = self.generate_cells(difficulty, safe_pos) if difficulty else []
         self.solved: bool = False
+        self._parent: GameState = parent
+
+    @property
+    def parent(self) -> GameState:
+        return self._parent
+
+    @property
+    def changed(self) -> bool:
+        return self._changed
+
+    @changed.setter
+    def changed(self, value: bool) -> None:
+        if self._changed != value:
+            self._changed = value
+            if value:
+                self.parent.changed_subgrids.add(self)
 
     def generate_cells(self, difficulty: GameDifficulty, safe_pos: tuple[int, int] | None) -> list[list[Cell]]:
         """
@@ -136,9 +179,9 @@ class SubGrid:
         return f"{self.pos[0]},{self.pos[1]}"
 
     @staticmethod
-    def from_dict(data: dict[str, Any]) -> SubGrid:
+    def from_dict(parent: GameState, data: dict[str, Any]) -> SubGrid:
         """Create a SubGrid instance from its dictionary representation."""
-        sg: SubGrid = SubGrid(tuple(data["pos"]))
+        sg: SubGrid = SubGrid(parent, tuple(data["pos"]))
         sg.cells = [[Cell.from_dict(sg, cell) for cell in row] for row in data["cells"]]
         sg.solved = data.get("solved", False)
         if sg.solved:
@@ -166,7 +209,7 @@ class GameState:
         self.difficulty: GameDifficulty = user["prefs"]["difficulty"]
         self.theme: str = user["prefs"]["theme"]
         self.subgrids: dict[tuple[int, int], SubGrid] = {}
-        self.subgrids[(0, 0)] = SubGrid((0, 0), self.difficulty)
+        self.subgrids[(0, 0)] = SubGrid(self, (0, 0), self.difficulty)
         game = user["game"]
         offset: list[str] = game["board_offset"].split(",")
         assert len(offset) == 2
@@ -176,6 +219,8 @@ class GameState:
         self.play_duration: int = game["play_duration"]
         self.game_over: bool = game["game_over"]
         self.num_grids_saved: int = 0
+        self.highlighted_cells: set[Cell] = set()
+        self.changed_subgrids: set[SubGrid] = set()
 
     def to_dict(self) -> dict[str, Any]:
         """Return a dictionary representation of the game state."""
@@ -193,15 +238,17 @@ class GameState:
     def new_game(self) -> None:
         """Start a new game by resetting the game state."""
 
-        sg = SubGrid((0, 0), self.difficulty)
+        sg = SubGrid(self, (0, 0), self.difficulty)
         sg.changed = True
-        self.subgrids: dict[tuple[int, int], SubGrid] = {(0, 0): sg}
+        self.subgrids = {(0, 0): sg}
         self.offset = Offset(0, 0)
-        self.num_solved: int = 0
-        self.started_ts: int = int(time.time())
-        self.play_duration: int = 0
-        self.num_grids_saved: int = 0
+        self.num_solved = 0
+        self.started_ts = int(time.time())
+        self.play_duration = 0
+        self.num_grids_saved = 0
         self.game_over = False
+        self.clear_highlighted()
+        self.clear_changed()
 
         conn = db.get_db_connection()
         with conn:
@@ -260,7 +307,7 @@ class GameState:
                 key_parts: list[str] = row["sub_grid_id"].split(",")
                 coords: tuple[int, int] = (int(key_parts[0]), int(key_parts[1]))
                 sg_data = orjson.loads(row["grid_data"])
-                sg: SubGrid = SubGrid.from_dict(sg_data)
+                sg: SubGrid = SubGrid.from_dict(state, sg_data)
                 state.subgrids[coords] = sg
                 if sg.solved:
                     state.num_solved += 1
@@ -284,18 +331,21 @@ class GameState:
                 (self.user["game"]["id"], self.user["id"], score),
             )
 
-    def save(self) -> None:
-        """Save the game state to the SQLite database."""
-        conn = db.get_db_connection()
-        self.user["prefs"] = {"theme": self.theme, "difficulty": self.difficulty}
-        user_id = self.user["id"]
-        self.user["game"]["play_duration"] = self.play_duration
-        self.user["game"]["game_over"] = self.game_over
-        self.user["game"]["board_offset"] = f"{self.offset.x},{self.offset.y}"
+    def save(self) -> int:
+        """
+        Save the game state to the SQLite database.
 
-        with conn:
+        Returns:
+            int: The number of subgrids saved.
+        """
+        with db.get_db_connection() as conn:
+            self.user["prefs"] = {"theme": self.theme, "difficulty": self.difficulty}
+            user_id = self.user["id"]
+            self.user["game"]["play_duration"] = self.play_duration
+            self.user["game"]["game_over"] = self.game_over
+            self.user["game"]["board_offset"] = f"{self.offset.x},{self.offset.y}"
+
             cursor = conn.cursor()
-            # Update user preferences.
             cursor.execute(
                 """UPDATE user_prefs SET theme = ?, difficulty = ? WHERE id = ?""",
                 (self.theme, self.difficulty.value, user_id),
@@ -312,17 +362,17 @@ class GameState:
 
             # Save each subgrid using upsert.
             self.num_grids_saved = 0
-            for sg_coord, subgrid in self.subgrids.items():
-                if not subgrid.changed:
-                    continue
+            for sg in self.changed_subgrids:
                 self.num_grids_saved += 1
-                subgrid.clear_changed()
-                sub_grid_id = f"{sg_coord[0]},{sg_coord[1]}"
-                grid_data = orjson.dumps(subgrid.to_dict()).decode("utf-8")
+                sg.clear_changed()
+                sub_grid_id = f"{sg.pos[0]},{sg.pos[1]}"
+                grid_data = orjson.dumps(sg.to_dict()).decode("utf-8")
                 cursor.execute(
                     """INSERT OR REPLACE INTO grids (game_id, user_id, sub_grid_id, grid_data) VALUES (?,?,?,?)""",
                     (self.user["game"]["id"], user_id, sub_grid_id, grid_data),
                 )
+            self.clear_changed()
+        return self.num_grids_saved
 
     @property
     def time_played(self) -> str:
@@ -331,3 +381,15 @@ class GameState:
         hours, remainder = divmod(elapsed, 3600)
         minutes, seconds = divmod(remainder, 60)
         return f"{str(hours).rjust(2, '0')}:{str(minutes).rjust(2, '0')}:{str(seconds).rjust(2, '0')}"
+
+    def clear_highlighted(self) -> None:
+        """Clear the highlighted flag for all cells in all subgrids."""
+        for cell in list(self.highlighted_cells):
+            cell.highlighted = False
+        self.highlighted_cells.clear()
+
+    def clear_changed(self) -> None:
+        """Clear the changed flag for all subgrids."""
+        for sg in list(self.changed_subgrids):
+            sg.clear_changed()
+        self.changed_subgrids.clear()

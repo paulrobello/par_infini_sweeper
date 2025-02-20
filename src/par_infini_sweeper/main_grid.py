@@ -32,7 +32,6 @@ class MainGrid(Widget, can_focus=True):
         self.drag_threshold: int = 2  # minimal cells to distinguish a drag from a click
         self.is_dragging: bool = False
         self.debug = False
-        self.show_grid_borders: bool = False
 
     def on_mount(self) -> None:
         """Center subgrid 0,0"""
@@ -43,10 +42,20 @@ class MainGrid(Widget, can_focus=True):
 
     def update_info(self) -> None:
         """Update the info bar with the current game state."""
-        self.game_state.play_duration += 1
+        if not self.game_state.game_over:
+            self.game_state.play_duration += 1
         game_over_text = "" if not self.game_state.game_over else " - [red]Game Over![/]"
         self.info.update(
-            f' [#5F5FFF]{self.game_state.user["nickname"]}[/] - Difficulty: [#00FF00]{self.game_state.difficulty}[/] - Solved: {self.game_state.num_solved} / {self.game_state.num_subgrids} - Score: [#00FF00]{self.game_state.score()}[/] - Time: {self.game_state.time_played}{game_over_text}'
+            " - ".join(
+                [
+                    f" [#5F5FFF]{self.game_state.user['nickname']}[/]",
+                    f"Difficulty: [#00FF00]{self.game_state.difficulty}[/]",
+                    f"Solved: {self.game_state.num_solved} / {self.game_state.num_subgrids}",
+                    f"Score: [#00FF00]{self.game_state.score()}[/]",
+                    f"Time: {self.game_state.time_played}{game_over_text}",
+                    f"NS: {self.game_state.num_grids_saved}",
+                ]
+            )
         )
 
     def render(self) -> Text:
@@ -120,32 +129,26 @@ class MainGrid(Widget, can_focus=True):
         Returns:
             str: The string representation of the cell
         """
-        sg_coord: tuple[int, int] = (gx // 8, gy // 8)
-        local_x: int = gx % 8
-        local_y: int = gy % 8
-        if self.show_grid_borders:
-            if local_x == 0:
-                return "│ "
-            if local_y == 0:
-                return "──"
-        if sg_coord in self.game_state.subgrids:
-            subgrid: SubGrid = self.game_state.subgrids[sg_coord]
-            cell: Cell = subgrid.cells[local_y][local_x]
-            if self.debug or cell.uncovered:
-                if cell.is_mine:
-                    return "[bold red]💣[/]"
-                else:
-                    count: tuple[int, int] = self.count_adjacent_flags_mines(gx, gy)
-                    color = self.count_to_color(count[1])
-                    if subgrid.solved:
-                        color = "#A0A0A0"
-                        if count == 0:
-                            return f"[{color}]. [/]"
-                    return f"[{color}]{count[1]} [/]" if count[1] > 0 else "  "
-            else:
-                return "[red]⚑ [/]" if cell.marked else "■ "
-        else:
+        cell: Cell | None = self.global_to_cell(gx, gy)
+
+        if not cell:
             return "? "  # placeholder for not-yet generated subgrid
+        if self.debug or cell.uncovered:
+            if cell.is_mine:
+                return "[bold red]💣[/]"
+            else:
+                count: tuple[int, int] = self.count_adjacent_flags_mines(gx, gy)
+                color = self.count_to_color(count[1])
+                if cell.parent.solved:
+                    color = "#A0A0A0"
+                    if count == 0:
+                        return f"[{color}]. [/]"
+                color = "#FFFF00" if cell.highlighted else color
+                return f"[{color}]{count[1]} [/]" if count[1] > 0 else "  "
+        else:
+            color = "#FFFF00" if cell.highlighted else "#E0E0E0"
+            return "[red]⚑ [/]" if cell.marked else f"[{color}]■ [/]"
+
 
     def count_adjacent_flags_mines(self, gx: int, gy: int) -> tuple[int, int]:
         """
@@ -249,14 +252,9 @@ class MainGrid(Widget, can_focus=True):
             self.notify("No uncovered neighbors")
             return
 
-        local_x: int = gx % 8
-        local_y: int = gy % 8
-        if sg_coord not in self.game_state.subgrids:
-            self.game_state.subgrids[sg_coord] = SubGrid(sg_coord, self.game_state.difficulty)
-        subgrid: SubGrid = self.game_state.subgrids[sg_coord]
-        cell: Cell = subgrid.cells[local_y][local_x]
+        cell: Cell | None = self.global_to_cell(gx, gy, True)
         # Do nothing if cell is marked or uncovered.
-        if cell.marked or cell.uncovered:
+        if not cell or cell.marked or cell.uncovered:
             return
 
         # Uncover the cell only if we are not in reveal surrounding mode
@@ -277,20 +275,43 @@ class MainGrid(Widget, can_focus=True):
                 ny: int = gy + dy
                 n_sg: tuple[int, int] = (nx // 8, ny // 8)
                 if n_sg not in self.game_state.subgrids:
-                    self.game_state.subgrids[n_sg] = SubGrid(n_sg, self.game_state.difficulty)
-        # If the cell has 0 neighboring mines, recursively reveal its neighbors.
-        counts: tuple[int, int] = self.count_adjacent_flags_mines(gx, gy)
-        if counts[1] == 0:
-            for dx in [-1, 0, 1]:
-                for dy in [-1, 0, 1]:
-                    if dx == 0 and dy == 0:
-                        continue
-                    nx: int = gx + dx
-                    ny: int = gy + dy
-                    # Prevent infinite recursion by limiting depth.
-                    if depth < 250:
+                    self.game_state.subgrids[n_sg] = SubGrid(self.game_state, n_sg, self.game_state.difficulty)
+
+        # Prevent infinite recursion by limiting depth.
+        if depth < 250:
+            # If the cell has 0 neighboring mines, recursively reveal its neighbors.
+            counts: tuple[int, int] = self.count_adjacent_flags_mines(gx, gy)
+            if counts[1] == 0:
+                for dx in [-1, 0, 1]:
+                    for dy in [-1, 0, 1]:
+                        if dx == 0 and dy == 0:
+                            continue
+                        nx: int = gx + dx
+                        ny: int = gy + dy
                         self.reveal_cell(nx, ny, depth + 1)
         self.check_subgrid_solved(sg_coord)
+
+    def global_to_cell(self, gx: int, gy: int, create_if_needed: bool = False) -> Cell | None:
+        """
+        Convert global coordinates to local cell coordinates.
+
+        Args:
+            gx (int): The global x-coordinate of the cell
+            gy (int): The global y-coordinate of the cell
+            create_if_needed (bool): Whether to create the subgrid if it does not exist
+
+        Returns:
+            Cell | None: The cell at the given coordinates, or None if the subgrid does not exist and create_if_needed is False
+        """
+        sg_coord: tuple[int, int] = (gx // 8, gy // 8)
+        local_x: int = gx % 8
+        local_y: int = gy % 8
+        if sg_coord not in self.game_state.subgrids:
+            if not create_if_needed:
+                return None
+            self.game_state.subgrids[sg_coord] = SubGrid(self.game_state, sg_coord, self.game_state.difficulty)
+        subgrid: SubGrid = self.game_state.subgrids[sg_coord]
+        return subgrid.cells[local_y][local_x]
 
     def reveal_surround(self, gx: int, gy: int) -> None:
         """
@@ -303,14 +324,8 @@ class MainGrid(Widget, can_focus=True):
         """
         if self.game_state.game_over:
             return
-        sg_coord: tuple[int, int] = (gx // 8, gy // 8)
-        if sg_coord not in self.game_state.subgrids:
-            return
-        subgrid: SubGrid = self.game_state.subgrids[sg_coord]
-        local_x: int = gx % 8
-        local_y: int = gy % 8
-        cell: Cell = subgrid.cells[local_y][local_x]
-        if not cell.uncovered:
+        cell: Cell | None = self.global_to_cell(gx, gy)
+        if not cell or not cell.uncovered:
             return
         counts: tuple[int, int] = self.count_adjacent_flags_mines(gx, gy)
         if not counts[0]:
@@ -328,6 +343,30 @@ class MainGrid(Widget, can_focus=True):
                     nx: int = gx + dx
                     ny: int = gy + dy
                     self.reveal_cell(nx, ny)
+        self.game_state.save()
+        self.refresh()
+
+    def check_highlight(self, gx: int, gy: int) -> None:
+        """
+        Highlight the cell at (gx, gy) and its neighbors.
+        Args:
+            gx (int): The global x-coordinate of the cell
+            gy (int): The global y-coordinate of the cell
+        """
+        if self.game_state.game_over:
+            return
+        cell: Cell | None = self.global_to_cell(gx, gy)
+        if not cell or not cell.uncovered:
+            return
+        cell.highlighted = True
+        for dx in [-1, 0, 1]:
+            for dy in [-1, 0, 1]:
+                if dx == 0 and dy == 0:
+                    continue
+            cell = self.global_to_cell(gx + dx, gy + dy)
+            if cell:
+                cell.highlighted = True
+        self.refresh()
 
     def toggle_mark(self, gx: int, gy: int, surround: bool = False) -> None:
         """
@@ -336,15 +375,11 @@ class MainGrid(Widget, can_focus=True):
         Args:
             gx (int): The global x-coordinate of the cell
             gy (int): The global y-coordinate of the cell
+            surround (bool): Whether to reveal surrounding cells if the cell is already uncovered
         """
-        sg_coord: tuple[int, int] = (gx // 8, gy // 8)
-        local_x: int = gx % 8
-        local_y: int = gy % 8
-        if sg_coord not in self.game_state.subgrids:
+        cell: Cell | None = self.global_to_cell(gx, gy)
+        if not cell:
             return
-            # self.game_state.subgrids[sg_coord] = SubGrid(sg_coord, self.game_state.difficulty)
-        subgrid: SubGrid = self.game_state.subgrids[sg_coord]
-        cell: Cell = subgrid.cells[local_y][local_x]
         if cell.uncovered:
             if not surround:
                 return
@@ -353,6 +388,24 @@ class MainGrid(Widget, can_focus=True):
         cell.marked = not cell.marked
         self.game_state.save()
         self.refresh()
+
+    def mouse_to_grid(self, event: MouseEvent) -> tuple[int, int]:
+        """
+        Convert mouse event coordinates to global cell coordinates.
+
+        Args:
+            event (MouseEvent): The mouse event
+
+        Returns:
+            tuple[int, int]: The global cell coordinates (gx, gy)
+        """
+        cell_width: int = 2
+        cell_height: int = 1
+        col: int = event.x // cell_width
+        row: int = event.y // cell_height
+        gx: int = col + self.board_offset.x
+        gy: int = row + self.board_offset.y
+        return gx, gy
 
     def handle_click(self, event: MouseDown | MouseUp) -> None:
         """
@@ -364,17 +417,11 @@ class MainGrid(Widget, can_focus=True):
         """
         if self.is_dragging:
             return
-        cell_width: int = 2
-        cell_height: int = 1
-        col: int = event.x // cell_width
-        row: int = event.y // cell_height
-        gx: int = col + self.board_offset.x
-        gy: int = row + self.board_offset.y
+        gx, gy = self.mouse_to_grid(event)
         if event.button == 1 and not (event.shift or event.ctrl):
             self.reveal_cell(gx, gy)
         elif event.button == 1 and (event.shift or event.ctrl):
             self.toggle_mark(gx, gy, True)
-
 
     def adjust_mouse_pos(self, event: MouseEvent) -> None:
         """
@@ -396,6 +443,9 @@ class MainGrid(Widget, can_focus=True):
         """
         self.adjust_mouse_pos(event)
         self.drag_start = (event.x, event.y)
+        gx, gy = self.mouse_to_grid(event)
+        if event.button == 1 and (event.shift or event.ctrl):
+            self.check_highlight(gx, gy)
 
     def on_mouse_move(self, event: MouseMove) -> None:
         """
@@ -435,6 +485,7 @@ class MainGrid(Widget, can_focus=True):
             self.handle_click(event)
         self.drag_start = None
         self.is_dragging = False
+        self.game_state.clear_highlighted()
         self.game_state.save()
         self.refresh()
         if self.game_state.game_over:

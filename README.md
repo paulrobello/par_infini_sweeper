@@ -95,6 +95,9 @@ uv run pim [OPTIONS]
 - Optimize for more performance
 
 ## Whats New
+- Version 0.2.6:
+  - Now stops timer on game over
+  - Now highlights surrounding cells when shift/ctrl + left-click on uncovered cells
 - Version 0.2.5:
   - Disabled some toasts to reduce clutter
   - Moved middle click function to shift/ctrl + left-click on uncovered cells
