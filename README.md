@@ -96,6 +96,8 @@ uv run pim [OPTIONS]
 
 ## Whats New
 - Version 0.2.6:
+  - Now only highlights unrevealed surrounding cells when shift/ctrl + left-click on uncovered cells 
+- Version 0.2.6:
   - Now stops timer on game over
   - Now highlights surrounding cells when shift/ctrl + left-click on uncovered cells
 - Version 0.2.5:

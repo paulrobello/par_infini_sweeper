@@ -385,7 +385,7 @@ class MainGrid(Widget, can_focus=True):
                 if dx == 0 and dy == 0:
                     continue
                 cell = self.global_to_cell(gx + dx, gy + dy)
-                if cell:
+                if cell and not cell.uncovered:
                     cell.highlighted = True
         self.refresh()
 
