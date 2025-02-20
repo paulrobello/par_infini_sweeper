@@ -370,7 +370,7 @@ class MainGrid(Widget, can_focus=True):
             self.reveal_cell(gx, gy)
         elif (event.button == 2 and not event.shift) or (event.button == 1 and event.shift):
             self.toggle_mark(gx, gy)
-        elif event.button == 2 and event.shift:
+        elif event.button == 2 and (event.shift or event.ctrl):
             self.reveal_surround(gx, gy)
 
     def adjust_mouse_pos(self, event: MouseEvent) -> None:
