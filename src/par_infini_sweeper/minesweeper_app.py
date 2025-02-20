@@ -44,15 +44,15 @@ class MinesweeperApp(App):
         Binding(key="q", action="quit", description="Quit"),
     ]
 
-    def __init__(self, **kwargs: Any) -> None:
+    def __init__(self, user_name: str, nickname: str | None = None, **kwargs: Any) -> None:
         from par_infini_sweeper import db
 
         with db.get_db_connection() as conn:
-            db.init_db(conn)
+            db.init_db(conn, user_name)
 
         super().__init__(**kwargs)
         self.info = Static("Info", id="info")
-        self.game_state = GameState.load()
+        self.game_state = GameState.load(user_name, nickname)
         self.sweeper_widget = MainGrid(self.game_state, self.info)
 
     def compose(self) -> ComposeResult:

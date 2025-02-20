@@ -46,7 +46,7 @@ class MainGrid(Widget, can_focus=True):
         self.game_state.play_duration += 1
         game_over_text = "" if not self.game_state.game_over else " - [red]Game Over![/]"
         self.info.update(
-            f" Difficulty: {self.game_state.difficulty} - Solved: {self.game_state.num_solved} / {self.game_state.num_subgrids} - Score: {self.game_state.score()} - Time: {self.game_state.time_played}{game_over_text}"
+            f' [#5F5FFF]{self.game_state.user["nickname"]}[/] - Difficulty: [#00FF00]{self.game_state.difficulty}[/] - Solved: {self.game_state.num_solved} / {self.game_state.num_subgrids} - Score: [#00FF00]{self.game_state.score()}[/] - Time: {self.game_state.time_played}{game_over_text}'
         )
 
     def render(self) -> Text:

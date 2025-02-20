@@ -231,10 +231,16 @@ class GameState:
         return len(self.subgrids)
 
     @staticmethod
-    def load() -> GameState:
-        """Load the game state from the SQLite database or create a new one."""
+    def load(user_name: str, nickname: str | None = None) -> GameState:
+        """
+        Load the game state from the SQLite database or create a new one.
+
+        Args:
+            user_name (str): The name of the user.
+            nickname (str | None): The nickname of the user.
+        """
         with db.get_db_connection() as conn:
-            user = get_user(conn, "user")
+            user = get_user(conn, user_name, nickname)
             user_id = user["id"]
             game = user["game"]
             state = GameState(user)

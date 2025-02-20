@@ -16,8 +16,16 @@ def get_db_connection() -> sqlite3.Connection:
     return conn
 
 
-def init_db(conn: Connection, username: str = "user", nickname: str = "User") -> None:
-    """Initialize the SQLite database with required tables and default user."""
+def init_db(conn: Connection, username: str = "user", nickname: str | None = None) -> None:
+    """
+    Initialize the SQLite database with required tables and default user.
+
+    Args:
+        conn (Connection): SQLite connection object.
+        username (str): Default username.
+        nickname (str | None): Default nickname.
+
+    """
     conn = conn or get_db_connection()
     with conn:
         cursor = conn.cursor()
@@ -69,9 +77,11 @@ def init_db(conn: Connection, username: str = "user", nickname: str = "User") ->
             )
         """)
         # Create default user "user" if not exists.
-        cursor.execute("SELECT id FROM users WHERE username = ? AND nickname = ?", (username, nickname))
+        cursor.execute("SELECT id FROM users WHERE username = ?", (username,))
         if cursor.fetchone() is None:
-            cursor.execute("INSERT INTO users (username, nickname) VALUES (?, ?)", (username, nickname))
+            cursor.execute(
+                "INSERT INTO users (username, nickname) VALUES (?, ?)", (username, nickname or username.capitalize())
+            )
             user_id = cursor.lastrowid
             cursor.execute(
                 "INSERT INTO user_prefs (id, theme, difficulty) VALUES (?,?,?)", (user_id, "textual-dark", "easy")
@@ -79,10 +89,10 @@ def init_db(conn: Connection, username: str = "user", nickname: str = "User") ->
             cursor.execute("INSERT INTO games (user_id) VALUES (?)", (user_id,))
 
 
-def get_user(conn: Connection, username: str = "user", nickname: str = "User") -> dict[str, Any]:
+def get_user(conn: Connection, username: str = "user", nickname: str | None = None) -> dict[str, Any]:
     """Load default user."""
     cursor = conn.cursor()
-    cursor.execute("SELECT id FROM users WHERE username = ?", (username,))
+    cursor.execute("SELECT * FROM users WHERE username = ?", (username,))
     user = dict(cursor.fetchone())
     if user is None:
         # If default user not found, initialize the DB.
@@ -90,6 +100,9 @@ def get_user(conn: Connection, username: str = "user", nickname: str = "User") -
         cursor = conn.cursor()
         cursor.execute("SELECT id FROM users WHERE username = ?", ("user",))
         user = dict(cursor.fetchone())
+    else:
+        user["nickname"] = nickname or user["nickname"]
+        cursor.execute("UPDATE users SET nickname = ? WHERE id = ?", (user["nickname"], user["id"]))
 
     user_id = user["id"]
     cursor.execute("SELECT theme, difficulty FROM user_prefs WHERE id = ?", (user_id,))

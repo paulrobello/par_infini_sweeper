@@ -83,18 +83,21 @@ uv run pim [OPTIONS]
 
 
 ### CLI Options
-- `-s`, `--server`: Start webserver that allows app to be played in a browser              
-- `-h`, `--help`: Show this help message and exit
-- `--version`, `-v`: Print version information and exit
+```
+--server              -s            Start webserver that allows app to be played in a browser
+--user                -u      TEXT  User name to use [default: logged in username]
+--nick                -n      TEXT  Set user nickname [default: None]
+--version             -v
+--help                              Show this message and exit.
+```
 
 ## Roadmap
 
-- Add multi user support
-- Add multi game support
 - Optimize for more performance
 
 ## Whats New
-
+- Version 0.2.3:
+  - Enabled multi user support
 - Version 0.2.0:
   - Added webserver to play in a browser
 - Version 0.1.0:

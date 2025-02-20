@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from typing import Annotated
 
 import typer
@@ -30,6 +31,8 @@ def main(
     start_server: Annotated[
         bool, typer.Option("--server", "-s", help="Start webserver that allows app to be played in a browser")
     ] = False,
+    user_name: Annotated[str, typer.Option("--user", "-u", help="User name to use")] = os.environ.get("USER", "user"),
+    nickname: Annotated[str | None, typer.Option("--nick", "-n", help="Set user nickname")] = None,
     version: Annotated[  # pylint: disable=unused-argument
         bool | None,
         typer.Option("--version", "-v", callback=version_callback, is_eager=True),
@@ -41,7 +44,7 @@ def main(
         server.serve()
         return
 
-    sweeper_app: MinesweeperApp = MinesweeperApp()
+    sweeper_app: MinesweeperApp = MinesweeperApp(user_name, nickname)
     sweeper_app.run()
 
 
