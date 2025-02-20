@@ -19,19 +19,23 @@ class MainGrid(Widget, can_focus=True):
         Binding(key="o", action="origin", description="Origin"),
         Binding(key="c", action="center", description="Center"),
         Binding(key="d", action="debug", description="Debug", show=False),
+        Binding(key="ctrl+d", action="xray", description="X-Ray", show=False),
         Binding(key="h", action="highscores", description="Highscores"),
     ]
     ALLOW_SELECT = False
 
-    def __init__(self, game_state: GameState, info: Static) -> None:
+    def __init__(self, game_state: GameState, info: Static, debug_panel: Static) -> None:
         super().__init__()
         self.info = info
+        self.debug_panel = debug_panel
         self.game_state: GameState = game_state
         self.board_offset = Offset(game_state.offset.x, game_state.offset.y)
         self.drag_start: tuple[int, int] | None = None
         self.drag_threshold: int = 2  # minimal cells to distinguish a drag from a click
         self.is_dragging: bool = False
-        self.debug = False
+        self.debug = True
+        self.xray = False
+        self.debug_panel.display = self.debug
 
     def on_mount(self) -> None:
         """Center subgrid 0,0"""
@@ -53,7 +57,15 @@ class MainGrid(Widget, can_focus=True):
                     f"Solved: {self.game_state.num_solved} / {self.game_state.num_subgrids}",
                     f"Score: [#00FF00]{self.game_state.score()}[/]",
                     f"Time: {self.game_state.time_played}{game_over_text}",
-                    f"NS: {self.game_state.num_grids_saved}",
+
+                ]
+            )
+        )
+        self.debug_panel.update(
+            "\n".join(
+                [
+                    f"NumHighlighted: {len(self.game_state.highlighted_cells)}",
+                    f"NumSaved: {self.game_state.num_grids_saved}",
                 ]
             )
         )
@@ -94,6 +106,10 @@ class MainGrid(Widget, can_focus=True):
 
     def action_debug(self) -> None:
         self.debug = not self.debug
+        self.debug_panel.display = self.debug
+
+    def action_xray(self) -> None:
+        self.xray= not self.xray
         self.refresh()
 
     @staticmethod
@@ -132,19 +148,20 @@ class MainGrid(Widget, can_focus=True):
         cell: Cell | None = self.global_to_cell(gx, gy)
 
         if not cell:
-            return "? "  # placeholder for not-yet generated subgrid
-        if self.debug or cell.uncovered:
+            return "[#C0C0C0]? [/]"  # placeholder for not-yet generated subgrid
+
+        if self.xray or cell.uncovered:
             if cell.is_mine:
-                return "[bold red]💣[/]"
+                return "[red]💣[/]"
+            count: tuple[int, int] = self.count_adjacent_flags_mines(gx, gy)
+            if cell.parent.solved:
+                color = "#A0A0A0"
             else:
-                count: tuple[int, int] = self.count_adjacent_flags_mines(gx, gy)
-                color = self.count_to_color(count[1])
-                if cell.parent.solved:
-                    color = "#A0A0A0"
-                    if count == 0:
-                        return f"[{color}]. [/]"
-                color = "#FFFF00" if cell.highlighted else color
-                return f"[{color}]{count[1]} [/]" if count[1] > 0 else "  "
+                color =  "#FFFF00" if cell.highlighted else self.count_to_color(count[1])
+            if cell.parent.solved:
+                if count[1] == 0:
+                    return f"[{color}]. [/]"
+            return f"[{color}]{count[1]} [/]" if count[1] > 0 else "  "
         else:
             color = "#FFFF00" if cell.highlighted else "#E0E0E0"
             return "[red]⚑ [/]" if cell.marked else f"[{color}]■ [/]"
@@ -346,9 +363,9 @@ class MainGrid(Widget, can_focus=True):
         self.game_state.save()
         self.refresh()
 
-    def check_highlight(self, gx: int, gy: int) -> None:
+    def highlight_neighbors(self, gx: int, gy: int) -> None:
         """
-        Highlight the cell at (gx, gy) and its neighbors.
+        Highlight the cell neighbors around (gx, gy).
         Args:
             gx (int): The global x-coordinate of the cell
             gy (int): The global y-coordinate of the cell
@@ -358,14 +375,18 @@ class MainGrid(Widget, can_focus=True):
         cell: Cell | None = self.global_to_cell(gx, gy)
         if not cell or not cell.uncovered:
             return
-        cell.highlighted = True
+        counts: tuple[int, int] = self.count_adjacent_flags_mines(gx, gy)
+        if not counts[1]:
+            return
+
+        # cell.highlighted = True
         for dx in [-1, 0, 1]:
             for dy in [-1, 0, 1]:
                 if dx == 0 and dy == 0:
                     continue
-            cell = self.global_to_cell(gx + dx, gy + dy)
-            if cell:
-                cell.highlighted = True
+                cell = self.global_to_cell(gx + dx, gy + dy)
+                if cell:
+                    cell.highlighted = True
         self.refresh()
 
     def toggle_mark(self, gx: int, gy: int, surround: bool = False) -> None:
@@ -443,9 +464,10 @@ class MainGrid(Widget, can_focus=True):
         """
         self.adjust_mouse_pos(event)
         self.drag_start = (event.x, event.y)
-        gx, gy = self.mouse_to_grid(event)
+
         if event.button == 1 and (event.shift or event.ctrl):
-            self.check_highlight(gx, gy)
+            gx, gy = self.mouse_to_grid(event)
+            self.highlight_neighbors(gx, gy)
 
     def on_mouse_move(self, event: MouseMove) -> None:
         """

@@ -17,6 +17,7 @@ from rich.console import ConsoleRenderable, RichCast
 from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
+from textual.containers import Horizontal, Vertical
 from textual.visual import SupportsVisual, Visual
 from textual.widgets import Footer, Header, Static
 
@@ -52,14 +53,19 @@ class MinesweeperApp(App):
 
         super().__init__(**kwargs)
         self.info = Static("Info", id="info")
+        self.debug_panel = Static("Debug", id="debug")
         self.game_state = GameState.load(user_name, nickname)
-        self.sweeper_widget = MainGrid(self.game_state, self.info)
+        self.sweeper_widget = MainGrid(self.game_state, self.info, self.debug_panel)
+
 
     def compose(self) -> ComposeResult:
         yield Header()
         yield Footer()
-        yield self.info
-        yield self.sweeper_widget
+        with Vertical():
+            yield self.info
+            with Horizontal():
+                yield self.sweeper_widget
+                yield self.debug_panel
 
     def on_mount(self) -> None:
         self.theme = self.game_state.theme
@@ -75,8 +81,8 @@ class MinesweeperApp(App):
         """Show help screen"""
         self.app.push_screen(HelpDialog())
 
-    def set_info(self, text: ConsoleRenderable | RichCast | str | SupportsVisual | Visual) -> None:
-        self.info.update(text)
+    def set_debug(self, text: ConsoleRenderable | RichCast | str | SupportsVisual | Visual) -> None:
+        self.debug_panel.update(text)
 
     @work
     async def action_new_game(self) -> None:

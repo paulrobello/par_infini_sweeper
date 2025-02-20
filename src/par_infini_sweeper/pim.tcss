@@ -10,9 +10,20 @@ MainGrid {
 
 Screen {
     background: #121212;
+    Horizontal{
+        width: 1fr;
+        height: 1fr;
+    }
 }
 
 #info {
     height: 1;
     width: 1fr;
+}
+
+#debug {
+    dock: right;
+    width: 30%;
+    height: 1fr;
+    border-left: solid $accent;
 }
