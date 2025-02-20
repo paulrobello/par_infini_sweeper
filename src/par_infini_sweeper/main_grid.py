@@ -314,21 +314,22 @@ class MainGrid(Widget, can_focus=True):
             return
         counts: tuple[int, int] = self.count_adjacent_flags_mines(gx, gy)
         if not counts[0]:
-            self.notify("No flagged cells", severity="warning")
+            # self.notify("No flagged cells", severity="warning")
             return
         if cell.uncovered:
             if counts[0] != counts[1]:
-                self.notify("Flag count does not match mine count", severity="error")
-            else:
-                for dx in [-1, 0, 1]:
-                    for dy in [-1, 0, 1]:
-                        if dx == 0 and dy == 0:
-                            continue
-                        nx: int = gx + dx
-                        ny: int = gy + dy
-                        self.reveal_cell(nx, ny)
+                # self.notify("Flag count does not match mine count", severity="error")
+                return
 
-    def toggle_mark(self, gx: int, gy: int) -> None:
+            for dx in [-1, 0, 1]:
+                for dy in [-1, 0, 1]:
+                    if dx == 0 and dy == 0:
+                        continue
+                    nx: int = gx + dx
+                    ny: int = gy + dy
+                    self.reveal_cell(nx, ny)
+
+    def toggle_mark(self, gx: int, gy: int, surround: bool = False) -> None:
         """
         Toggle the mark (flag) on the cell at global coordinates (gx, gy).
 
@@ -345,6 +346,9 @@ class MainGrid(Widget, can_focus=True):
         subgrid: SubGrid = self.game_state.subgrids[sg_coord]
         cell: Cell = subgrid.cells[local_y][local_x]
         if cell.uncovered:
+            if not surround:
+                return
+            self.reveal_surround(gx, gy)
             return
         cell.marked = not cell.marked
         self.game_state.save()
@@ -369,9 +373,8 @@ class MainGrid(Widget, can_focus=True):
         if event.button == 1 and not (event.shift or event.ctrl):
             self.reveal_cell(gx, gy)
         elif event.button == 1 and (event.shift or event.ctrl):
-            self.toggle_mark(gx, gy)
-        elif event.button == 2:
-            self.reveal_surround(gx, gy)
+            self.toggle_mark(gx, gy, True)
+
 
     def adjust_mouse_pos(self, event: MouseEvent) -> None:
         """
