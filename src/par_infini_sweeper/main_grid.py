@@ -366,9 +366,9 @@ class MainGrid(Widget, can_focus=True):
         row: int = event.y // cell_height
         gx: int = col + self.board_offset.x
         gy: int = row + self.board_offset.y
-        if event.button == 1 and not event.shift:
+        if event.button == 1 and not (event.shift or event.ctrl):
             self.reveal_cell(gx, gy)
-        elif event.button == 1 and event.shift:
+        elif event.button == 1 and (event.shift or event.ctrl):
             self.toggle_mark(gx, gy)
         elif event.button == 2:
             self.reveal_surround(gx, gy)
