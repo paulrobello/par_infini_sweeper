@@ -107,6 +107,8 @@ uv run pim [OPTIONS]
 - Optimize for more performance
 
 ## Whats New
+- Version 0.2.9:
+  - Fixed some first run db issues
 - Version 0.2.8:
   - Addata game data backup
   - Updated readme and help
