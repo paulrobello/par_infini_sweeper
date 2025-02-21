@@ -1,8 +1,18 @@
 # Par Infinite Minesweeper
 
+[![PyPI](https://img.shields.io/pypi/v/par_infini_sweeper)](https://pypi.org/project/par_infini_sweeper/)
+[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/par_infini_sweeper.svg)](https://pypi.org/project/par_infini_sweeper/)  
+![Runs on Linux | MacOS | Windows](https://img.shields.io/badge/runs%20on-Linux%20%7C%20MacOS%20%7C%20Windows-blue)
+![Arch x86-63 | ARM | AppleSilicon](https://img.shields.io/badge/arch-x86--64%20%7C%20ARM%20%7C%20AppleSilicon-blue)  
+![PyPI - License](https://img.shields.io/pypi/l/par_infini_sweeper)
+
 ## Description
 
 Infinite Minesweeper TUI. Play a game of minesweeper with infinite board size!
+
+[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://buymeacoffee.com/probello3)
+
+## Screenshots
 
 ![Par Infinite Minesweeper](https://raw.githubusercontent.com/paulrobello/par_infini_sweeper/main/Screenshot.png)
 
@@ -10,6 +20,12 @@ Infinite Minesweeper TUI. Play a game of minesweeper with infinite board size!
 - Python
 - Textual
 - Sqlite3
+
+## Key Features:
+
+* Infinite board size
+* Local high scores
+* Auto saves and can be resumed
 
 ## Objective
 The goal of the game is to uncover all the cells that do not contain mines. 
@@ -107,6 +123,9 @@ uv run pim [OPTIONS]
 - Optimize for more performance
 
 ## Whats New
+- Version 0.2.10:
+  - Updated package metadata
+  - Removed some unnecessary dependencies
 - Version 0.2.9:
   - Fixed some first run db issues
 - Version 0.2.8:
