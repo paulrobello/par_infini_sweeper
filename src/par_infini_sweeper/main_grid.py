@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from rich.panel import Panel
 from rich.text import Text
 from textual import work
 from textual.binding import Binding
@@ -9,7 +8,6 @@ from textual.geometry import Offset
 from textual.widget import Widget
 from textual.widgets import Static
 
-from par_infini_sweeper import db
 from par_infini_sweeper.data_structures import GameState, GridPos
 from par_infini_sweeper.dialogs.information import InformationDialog
 
@@ -22,8 +20,7 @@ class MainGrid(Widget, can_focus=True):
         Binding(key="c", action="center", description="Center"),
         Binding(key="d", action="debug", description="Debug", show=False),
         Binding(key="p", action="pause", description="Pause"),
-        Binding(key="ctrl+d", action="xray", description="X-Ray", show=False),
-        Binding(key="h", action="highscores", description="Highscores"),
+        # Binding(key="ctrl+d", action="xray", description="X-Ray", show=False),
     ]
     ALLOW_SELECT = False
 
@@ -90,19 +87,14 @@ class MainGrid(Widget, can_focus=True):
         """Center view on center of board"""
         c = self.game_state.compute_board_center()
         self.game_state.offset = Offset(-self.size.width // 4 + c.x, -self.size.height // 4 + c.y)
+        self.game_state.save()
         self.refresh()
 
     def action_origin(self) -> None:
         """Center view on center of first subgrid"""
         self.game_state.offset = Offset(-self.size.width // 4 + 5, -self.size.height // 4 - 3)
+        self.game_state.save()
         self.refresh()
-
-    def action_highscores(self) -> None:
-        """Display the highscores for each game mode."""
-        data = db.get_highscores()
-        for mode, data in data.items():
-            scores = "\n".join([f"{row['nickname']} - {row['score']}" for row in data])
-            self.app.push_screen(InformationDialog("Highscores", Panel(scores, title=str(mode).capitalize())))
 
     def action_debug(self) -> None:
         """Toggle the debug mode for the game."""

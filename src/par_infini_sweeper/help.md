@@ -6,20 +6,22 @@ If you uncover a cell that is not a mine, it will show a number indicating how m
 Use this information to determine which cells are safe to uncover.
 
 ## Controls
-Left click to uncover a cell. If a cell is flagged as a mine, it will not be uncovered.  
-Sub grids can only be unlocked when cells neighboring the sub grid are uncovered.  
-Shift or Ctrl + Left-click to toggle flagging a covered cell as a mine. On an uncovered cell it will uncover all neighboring cells. As a safety you must have same number of flags as mines in the neighboring cells.  
-Drag to pan the board.  
-  
-Keys:  
-* `F1` Help.
-* `N` New game.
-* `O` Move view to origin.
-* `C` Move view to board center (computed as center of exposed sub grids).
-* `P` Pause.
-* `H` Highscores.
-* `T` Change theme.
-* `Q` Quit.
+
+* Left click to uncover a cell. If a cell is flagged as a mine, it will not be uncovered.
+* Sub grids can only be unlocked when cells neighboring the sub grid are uncovered.
+* Shift or Ctrl + Left-click to toggle flagging a covered cell as a mine.
+* Shift or Ctrl + Left-click on an uncovered cell it will uncover all neighboring cells. 
+  * As a safety you must have same number of flags as mines in the neighboring cells.
+* Drag to pan the board.
+* Keys:
+  * `F1` Help.
+  * `N` New game.
+  * `O` Move view to origin.
+  * `C` Move view to board center (computed as center of exposed sub grids).
+  * `P` Pause.
+  * `H` Highscores.
+  * `T` Change theme.
+  * `Q` Quit.
 
 ## Scoring
 

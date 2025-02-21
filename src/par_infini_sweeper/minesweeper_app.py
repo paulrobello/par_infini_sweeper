@@ -14,6 +14,7 @@ from __future__ import annotations
 from typing import Any
 
 from rich.console import ConsoleRenderable, RichCast
+from rich.panel import Panel
 from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
@@ -21,9 +22,11 @@ from textual.containers import Horizontal, Vertical
 from textual.visual import SupportsVisual, Visual
 from textual.widgets import Footer, Header, Static
 
+from par_infini_sweeper import __application_title__, db
 from par_infini_sweeper.data_structures import GameState
 from par_infini_sweeper.dialogs.difficulty_dialog import DifficultyDialog
 from par_infini_sweeper.dialogs.help_dialog import HelpDialog
+from par_infini_sweeper.dialogs.information import InformationDialog
 from par_infini_sweeper.dialogs.theme_dialog import ThemeDialog
 from par_infini_sweeper.enums import GameDifficulty
 from par_infini_sweeper.main_grid import MainGrid
@@ -37,12 +40,16 @@ class MinesweeperApp(App):
       - n: New Game (prompts for difficulty)
     """
 
+    TITLE = __application_title__
+    ENABLE_COMMAND_PALETTE = False
+    ALLOW_SELECT = False
     CSS_PATH = "pim.tcss"
     BINDINGS = [
-        Binding(key="f1", action="help", description="Help", show=True),
         Binding(key="n", action="new_game", description="New Game"),
+        Binding(key="h", action="highscores", description="Highscores"),
         Binding(key="t", action="change_theme", description="Change Theme"),
         Binding(key="q", action="quit", description="Quit"),
+        Binding(key="f1", action="help", description="Help", show=True),
     ]
 
     def __init__(self, user_name: str, nickname: str | None = None, **kwargs: Any) -> None:
@@ -58,7 +65,7 @@ class MinesweeperApp(App):
         self.sweeper_widget = MainGrid(self.game_state, self.info, self.debug_panel)
 
     def compose(self) -> ComposeResult:
-        yield Header()
+        yield Header(show_clock=True)
         yield Footer()
         with Vertical():
             yield self.info
@@ -79,6 +86,13 @@ class MinesweeperApp(App):
     def action_help(self) -> None:
         """Show help screen"""
         self.app.push_screen(HelpDialog())
+
+    def action_highscores(self) -> None:
+        """Display the highscores for each game mode."""
+        data = db.get_highscores()
+        for mode, data in data.items():
+            scores = "\n".join([f"{row['nickname']} - {row['score']}" for row in data])
+            self.app.push_screen(InformationDialog("Highscores", Panel(scores, title=str(mode).capitalize())))
 
     def set_debug(self, text: ConsoleRenderable | RichCast | str | SupportsVisual | Visual) -> None:
         self.debug_panel.update(text)
