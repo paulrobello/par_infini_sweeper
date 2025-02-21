@@ -18,7 +18,7 @@ def get_db_connection() -> sqlite3.Connection:
     Also creates a backup of the database if it doesn't exist or if it's older than 1 day.
     """
     db_folder.mkdir(parents=True, exist_ok=True)
-    if not db_bak_path.exists():
+    if db_path.exists() and not db_bak_path.exists():
         db_bak_path.write_bytes(db_path.read_bytes())
     else:
         # if backup is older than 1 day, replace it with the current db
