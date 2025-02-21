@@ -46,9 +46,10 @@ Depending the difficulty level, the number of mines in each sub grid will vary.
 When all cells that are not mines in a sub grid are uncovered the sub grid is marked solved and flags are placed on any mines that are not already flagged.  
 Your score is the sum of all mines in the solved sub grids.  
 
-## Settings
+## Storage
 
-All data for the application is stored in a sqlite3 database located in `~/.pim/game_data.sqlite`
+All data for the application is stored in a sqlite3 database located in `~/.pim/game_data.sqlite`  
+The database is backed up daily to `~/.pim/game_data.sqlite.bak`  
 
 ## Prerequisites
 
@@ -106,6 +107,9 @@ uv run pim [OPTIONS]
 - Optimize for more performance
 
 ## Whats New
+- Version 0.2.8:
+  - Addata game data backup
+  - Updated readme and help
 - Version 0.2.7:
   - Added pause key `p`
   - Fixed bug where sometimes newly generated sub grids would not get saved if no cells were uncovered 

@@ -13,10 +13,17 @@ db_bak_path = db_folder / "game_data.sqlite.bak"
 
 
 def get_db_connection() -> sqlite3.Connection:
-    """Return a connection to the SQLite database with a 5 sec timeout."""
+    """
+    Return a connection to the SQLite database with a 5 sec timeout.
+    Also creates a backup of the database if it doesn't exist or if it's older than 1 day.
+    """
     db_folder.mkdir(parents=True, exist_ok=True)
     if not db_bak_path.exists():
         db_bak_path.write_bytes(db_path.read_bytes())
+    else:
+        # if backup is older than 1 day, replace it with the current db
+        if db_bak_path.stat().st_mtime < (db_path.stat().st_mtime - 86400):
+            db_bak_path.write_bytes(db_path.read_bytes())
 
     conn = sqlite3.connect(db_path, timeout=5)
     conn.row_factory = sqlite3.Row
