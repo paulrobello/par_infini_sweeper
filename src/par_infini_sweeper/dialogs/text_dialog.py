@@ -10,7 +10,7 @@ from textual.containers import Center, Vertical
 from textual.screen import ModalScreen
 from textual.visual import SupportsVisual
 from textual.widgets import Button, Static
-from textual.widgets._button import ButtonVariant
+from textual.widgets.button import ButtonVariant
 
 
 class TextDialog(ModalScreen[None]):
