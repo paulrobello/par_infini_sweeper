@@ -136,7 +136,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## Shoutout
 
-I would like to thank [Edward Jazzhands](http://edward-jazzhands.github.io/) for all his help testing and providing feedback / feature requests!
+I would like to thank [Edward Jazzhands](http://edward-jazzhands.github.io/) for all his help testing and feedback / feature requests!
 
 ## License
 
