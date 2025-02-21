@@ -3,7 +3,11 @@
 [![PyPI](https://img.shields.io/pypi/v/par_infini_sweeper)](https://pypi.org/project/par_infini_sweeper/)
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/par_infini_sweeper.svg)](https://pypi.org/project/par_infini_sweeper/)  
 ![Runs on Linux | MacOS | Windows](https://img.shields.io/badge/runs%20on-Linux%20%7C%20MacOS%20%7C%20Windows-blue)
-![Arch x86-63 | ARM | AppleSilicon](https://img.shields.io/badge/arch-x86--64%20%7C%20ARM%20%7C%20AppleSilicon-blue)  
+![Arch x86-63 | ARM | AppleSilicon](https://img.shields.io/badge/arch-x86--64%20%7C%20ARM%20%7C%20AppleSilicon-blue)
+![PyPI - Downloads](https://img.shields.io/pypi/dm/par_infini_sweeper)
+
+
+
 ![PyPI - License](https://img.shields.io/pypi/l/par_infini_sweeper)
 
 ## Description
