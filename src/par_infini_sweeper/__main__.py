@@ -40,7 +40,12 @@ def main(
 ) -> None:
     """Main function."""
     if start_server:
-        server = Server("pim")
+        server_args: list[str] = ["pim"]
+        if user_name:
+            server_args.extend(["--user", user_name])
+        if nickname:
+            server_args.extend(["--nick", nickname])
+        server = Server(" ".join(server_args))
         server.serve()
         return
 

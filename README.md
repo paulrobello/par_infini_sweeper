@@ -127,6 +127,8 @@ uv run pim [OPTIONS]
 - Optimize for more performance
 
 ## Whats New
+- Version 0.2.11:
+  - Fix server mode not using other parameters such as user and nick 
 - Version 0.2.10:
   - Updated package metadata
   - Removed some unnecessary dependencies
