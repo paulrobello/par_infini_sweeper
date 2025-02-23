@@ -41,6 +41,13 @@ def init_db(conn: Connection, username: str = "user", nickname: str | None = Non
         nickname (str | None): Default nickname.
 
     """
+
+    if len(username) > 20:
+        raise ValueError("Username must be 20 characters or less")
+
+    if nickname and len(nickname) > 20:
+        raise ValueError("Nickname must be 20 characters or less")
+
     conn = conn or get_db_connection()
     with conn:
         cursor = conn.cursor()
@@ -51,6 +58,9 @@ def init_db(conn: Connection, username: str = "user", nickname: str | None = Non
 
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")
         users_exists = cursor.fetchone() is not None
+
+        # update usernames and nicknames to be no longer than 20 characters
+        cursor.execute("UPDATE users SET username = substr(username, 1, 20), nickname = substr(nickname, 1, 20)")
 
         # If users table exists but pim_db_info does not, run migrate_db
         if users_exists and not pim_db_info_exists:

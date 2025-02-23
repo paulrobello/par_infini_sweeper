@@ -39,6 +39,14 @@ def main(
     ] = None,
 ) -> None:
     """Main function."""
+
+    if user_name and len(user_name) > 20:
+        console.print("User name must be 20 characters or less")
+        raise typer.Exit(1)
+    if nickname and len(nickname) > 20:
+        console.print("Nickname must be 20 characters or less")
+        raise typer.Exit(1)
+
     if start_server:
         server_args: list[str] = ["pim"]
         if user_name:
