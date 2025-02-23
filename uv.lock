@@ -781,7 +781,7 @@ requires-dist = [
     { name = "python-dotenv", specifier = ">=1.0.1" },
     { name = "requests", specifier = ">=2.32.3" },
     { name = "rich", specifier = ">=13.9.4" },
-    { name = "textual", specifier = ">=2.1.0" },
+    { name = "textual", specifier = ">=2.1.1" },
     { name = "textual-serve", specifier = ">=1.1.1" },
     { name = "typer", specifier = ">=0.15.1" },
 ]

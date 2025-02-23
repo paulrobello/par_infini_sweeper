@@ -45,7 +45,7 @@ class MainGrid(Widget, can_focus=True):
     def update_info(self) -> None:
         """Update the info bar with the current game state."""
         if not self.game_state.game_over and not self.game_state.paused:
-            self.game_state.play_duration += 1
+            self.game_state.duration += 1
 
         game_over_text = "" if not self.game_state.game_over else " - [red]Game Over![/]"
         self.info_bar.update(

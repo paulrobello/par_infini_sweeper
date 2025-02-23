@@ -1,6 +1,33 @@
 from sqlite3 import Connection
 
 
+def migrate_db_to_1_1(conn: Connection) -> None:
+    """
+    Migrate the SQLite database from version 1.0 to 1.1.
+
+    Args:
+        conn (Connection): SQLite connection object.
+    """
+    with conn:
+        cursor = conn.cursor()
+
+        # Add created_ts column to users table if it doesn't exist
+        cursor.execute("PRAGMA table_info(games)")
+        columns = [col[1] for col in cursor.fetchall()]
+
+        if "duration" not in columns:
+            cursor.execute("ALTER TABLE games ADD COLUMN duration INTEGER NOT NULL DEFAULT 0")
+            cursor.execute("UPDATE games SET duration = game_duration")
+            cursor.execute("ALTER TABLE games DROP COLUMN game_duration")
+
+        if "mode" not in columns:
+            cursor.execute("ALTER TABLE games ADD COLUMN mode TEXT NOT NULL DEFAULT 'infinite'")
+            cursor.execute("UPDATE games SET mode = game_mode")
+            cursor.execute("ALTER TABLE games DROP COLUMN game_mode")
+
+        cursor.execute("UPDATE pim_db_info set version = ?", ("1.1",))
+
+
 def migrate_legacy_db(conn: Connection) -> None:
     """
     Migrate the SQLite database to the current schema.
@@ -49,14 +76,14 @@ def migrate_legacy_db(conn: Connection) -> None:
                     user_id INTEGER NOT NULL,
                     game_mode TEXT NOT NULL DEFAULT 'infinite',
                     game_over BOOLEAN NOT NULL DEFAULT 0,
-                    play_duration INTEGER NOT NULL DEFAULT 0,
+                    duration INTEGER NOT NULL DEFAULT 0,
                     board_offset TEXT NOT NULL DEFAULT '0,0',
                     created_ts TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
                 )
             """)
             cursor.execute(
-                "INSERT INTO games_new (id, user_id, game_mode, game_over, play_duration, board_offset) SELECT id, user_id, game_mode, game_over, play_duration, board_offset FROM games"
+                "INSERT INTO games_new (id, user_id, game_mode, game_over, duration, board_offset) SELECT id, user_id, game_mode, game_over, duration, board_offset FROM games"
             )
             cursor.execute("DROP TABLE games")
             cursor.execute("ALTER TABLE games_new RENAME TO games")

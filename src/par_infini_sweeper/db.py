@@ -4,7 +4,7 @@ from sqlite3 import Connection, Cursor
 from typing import Any
 
 from par_infini_sweeper import __application_binary__
-from par_infini_sweeper.db_migrations import migrate_legacy_db
+from par_infini_sweeper.db_migrations import migrate_db_to_1_1, migrate_legacy_db
 from par_infini_sweeper.enums import GameDifficulty, GameMode
 
 db_folder = Path(f"~/.{__application_binary__}").expanduser()
@@ -73,9 +73,14 @@ def init_db(conn: Connection, username: str = "user", nickname: str | None = Non
         """)
         cursor.execute("SELECT version FROM pim_db_info")
         db_version = cursor.fetchone()
+        if db_version:
+            db_version = db_version[0]
         if db_version is None:
             db_version = "1.0"
             cursor.execute("INSERT INTO pim_db_info (version) VALUES (?)", (db_version,))
+        if db_version == "1.0":
+            migrate_db_to_1_1(conn)
+            db_version = "1.1"
 
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS users (
@@ -97,9 +102,9 @@ def init_db(conn: Connection, username: str = "user", nickname: str | None = Non
             CREATE TABLE IF NOT EXISTS games (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL,
-                game_mode TEXT NOT NULL DEFAULT 'infinite',
+                mode TEXT NOT NULL DEFAULT 'infinite',
                 game_over BOOLEAN NOT NULL DEFAULT 0,
-                play_duration INTEGER NOT NULL DEFAULT 0,
+                duration INTEGER NOT NULL DEFAULT 0,
                 board_offset TEXT NOT NULL DEFAULT '0,0',
                 created_ts TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -190,7 +195,7 @@ def get_user(conn: Connection, username: str = "user", nickname: str | None = No
 
 def get_highscores(num_scores: int = 10) -> dict[GameMode, list[dict[str, Any]]]:
     """
-    Return top num_scores highscores for each game_mode.
+    Return top num_scores highscores for each mode.
 
     Args:
         num_scores (int): Number of top scores to return for each game mode.
@@ -210,9 +215,9 @@ def get_highscores(num_scores: int = 10) -> dict[GameMode, list[dict[str, Any]]]
                 score,
                 h.created_ts,
                 u.nickname,
-                g.game_mode,
-                g.play_duration,
-                ROW_NUMBER() OVER (PARTITION BY g.game_mode ORDER BY score DESC, h.created_ts DESC) as rank
+                g.mode,
+                g.duration,
+                ROW_NUMBER() OVER (PARTITION BY g.mode ORDER BY score DESC, h.created_ts DESC) as rank
             FROM highscores h
             JOIN users u ON h.user_id = u.id
             JOIN games g ON g.id = h.game_id
@@ -221,11 +226,11 @@ def get_highscores(num_scores: int = 10) -> dict[GameMode, list[dict[str, Any]]]
             score,
             created_ts,
             nickname,
-            game_mode,
-            play_duration
+            mode,
+            duration
         FROM RankedScores
         WHERE rank <= ?
-        ORDER BY game_mode, rank;
+        ORDER BY mode, rank;
         """,
             (num_scores,),
         )
@@ -235,8 +240,8 @@ def get_highscores(num_scores: int = 10) -> dict[GameMode, list[dict[str, Any]]]
         for gm in GameMode:
             result[gm] = []
         for h in highscores:
-            if h["game_mode"] not in result:
-                result[GameMode(h["game_mode"])] = []
+            if h["mode"] not in result:
+                result[GameMode(h["mode"])] = []
 
-            result[GameMode(h["game_mode"])].append(h)
+            result[GameMode(h["mode"])].append(h)
         return result

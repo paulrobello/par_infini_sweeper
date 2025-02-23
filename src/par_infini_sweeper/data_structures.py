@@ -217,7 +217,7 @@ class GameState:
 
     def __init__(self, parent: Widget | None, user: dict[str, Any]) -> None:
         self.parent = parent
-        self.game_mode: GameMode = GameMode.INFINITE
+        self.mode: GameMode = GameMode.INFINITE
         self.user: dict[str, Any] = user
         self.difficulty: GameDifficulty = user["prefs"]["difficulty"]
         self.theme: str = user["prefs"]["theme"]
@@ -229,7 +229,7 @@ class GameState:
         self.offset = Offset(int(offset[0]), int(offset[1]))
         self.num_solved: int = 0
         self.started_ts: int = int(time.time())
-        self.play_duration: int = game["play_duration"]
+        self.duration: int = game["duration"]
         self.game_over: bool = game["game_over"]
         self.num_grids_saved: int = 0
         self.highlighted_cells: set[Cell] = set()
@@ -245,7 +245,7 @@ class GameState:
             "difficulty": self.difficulty,
             "game_over": self.game_over,
             "started_ts": self.started_ts,
-            "play_duration": self.play_duration,
+            "duration": self.duration,
             "offset": (self.offset.x, self.offset.y),
             "subgrids": {f"{k[0]},{k[1]}": sg.to_dict() for k, sg in self.subgrids.items()},
         }
@@ -259,7 +259,7 @@ class GameState:
         self.offset = Offset(0, 0)
         self.num_solved = 0
         self.started_ts = int(time.time())
-        self.play_duration = 0
+        self.duration = 0
         self.num_grids_saved = 0
         self.game_over = False
         self.clear_highlighted()
@@ -357,7 +357,7 @@ class GameState:
         with db.get_db_connection() as conn:
             self.user["prefs"] = {"theme": self.theme, "difficulty": self.difficulty}
             user_id = self.user["id"]
-            self.user["game"]["play_duration"] = self.play_duration
+            self.user["game"]["duration"] = self.duration
             self.user["game"]["game_over"] = self.game_over
             self.user["game"]["board_offset"] = f"{self.offset.x},{self.offset.y}"
 
@@ -367,11 +367,11 @@ class GameState:
                 (self.theme, self.difficulty.value, user_id),
             )
             cursor.execute(
-                """UPDATE games SET game_over = ?, board_offset = ?, play_duration = ? WHERE user_id = ?""",
+                """UPDATE games SET game_over = ?, board_offset = ?, duration = ? WHERE user_id = ?""",
                 (
                     self.user["game"]["game_over"],
                     self.user["game"]["board_offset"],
-                    self.user["game"]["play_duration"],
+                    self.user["game"]["duration"],
                     user_id,
                 ),
             )
@@ -393,7 +393,7 @@ class GameState:
     @property
     def time_played(self) -> str:
         """Calculate the time played in a human-readable format."""
-        elapsed = self.play_duration
+        elapsed = self.duration
         hours, remainder = divmod(elapsed, 3600)
         minutes, seconds = divmod(remainder, 60)
         return f"{str(hours).rjust(2, '0')}:{str(minutes).rjust(2, '0')}:{str(seconds).rjust(2, '0')}"
