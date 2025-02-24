@@ -127,9 +127,10 @@ uv run pim [OPTIONS]
 - Optimize for more performance
 
 ## Whats New
-- Version 0.2.11:
+- Version 0.3.0:
   - Fix server mode not using other parameters such as user and nick
   - Limit username and nickname to no more than 20 characters
+  - Added internet leaderboard!
 - Version 0.2.10:
   - Updated package metadata
   - Removed some unnecessary dependencies

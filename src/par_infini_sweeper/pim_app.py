@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Infinite Minesweeper implemented with Python 3.12 and the textual library.
 
@@ -11,10 +10,10 @@ Only in the initial subgrid may any cell be clicked; in other subgrids only cell
 
 from __future__ import annotations
 
+import os
 from typing import Any
 
 from rich.console import ConsoleRenderable, RichCast
-from rich.panel import Panel
 from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
@@ -22,22 +21,25 @@ from textual.containers import Horizontal, Vertical
 from textual.visual import SupportsVisual, Visual
 from textual.widgets import Footer, Header, Static
 
-from par_infini_sweeper import __application_title__, db
+from par_infini_sweeper import __application_title__
 from par_infini_sweeper.data_structures import GameState
 from par_infini_sweeper.dialogs.difficulty_dialog import DifficultyDialog
 from par_infini_sweeper.dialogs.help_dialog import HelpDialog
-from par_infini_sweeper.dialogs.information import InformationDialog
+from par_infini_sweeper.dialogs.highscore_dialog import HighscoreDialog
 from par_infini_sweeper.dialogs.theme_dialog import ThemeDialog
 from par_infini_sweeper.enums import GameDifficulty
 from par_infini_sweeper.main_grid import MainGrid
 
 
-class MinesweeperApp(App):
+class PimApp(App):
     """
     Textual App for Infinite Minesweeper.
     Bindings:
-      - q: Quit
       - n: New Game (prompts for difficulty)
+      - h: Highscores
+      - t: Change Theme
+      - q: Quit
+      - f1: Help
     """
 
     TITLE = __application_title__
@@ -52,7 +54,9 @@ class MinesweeperApp(App):
         Binding(key="f1", action="help", description="Help", show=True),
     ]
 
-    def __init__(self, user_name: str, nickname: str | None = None, **kwargs: Any) -> None:
+    def __init__(self, user_name: str | None = None, nickname: str | None = None, **kwargs: Any) -> None:
+        if not user_name:
+            user_name = os.environ.get("USER", "user")
         from par_infini_sweeper import db
 
         with db.get_db_connection() as conn:
@@ -89,10 +93,7 @@ class MinesweeperApp(App):
 
     def action_highscores(self) -> None:
         """Display the highscores for each game mode."""
-        data = db.get_highscores()
-        for mode, data in data.items():
-            scores = "\n".join([f"{row['nickname']} - {row['score']}" for row in data])
-            self.app.push_screen(InformationDialog("Highscores", Panel(scores, title=str(mode).capitalize())))
+        self.app.push_screen(HighscoreDialog())
 
     def set_debug(self, text: ConsoleRenderable | RichCast | str | SupportsVisual | Visual) -> None:
         self.debug_panel.update(text)

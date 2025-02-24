@@ -6,17 +6,14 @@ import os
 from typing import Annotated
 
 import typer
-from dotenv import load_dotenv
 from rich.console import Console
 from textual_serve.server import Server
 
 from par_infini_sweeper import __application_title__, __version__
-from par_infini_sweeper.minesweeper_app import MinesweeperApp
+from par_infini_sweeper.pim_app import PimApp
 
 app = typer.Typer()
 console = Console(stderr=True)
-
-load_dotenv()
 
 
 def version_callback(value: bool) -> None:
@@ -57,9 +54,9 @@ def main(
         server.serve()
         return
 
-    sweeper_app: MinesweeperApp = MinesweeperApp(user_name, nickname)
+    sweeper_app: PimApp = PimApp(user_name, nickname)
     sweeper_app.run()
 
 
 if __name__ == "__main__":
-    app()
+    main_app = app()

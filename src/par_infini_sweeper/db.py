@@ -1,11 +1,16 @@
+import base64
+import os
 import sqlite3
 from pathlib import Path
 from sqlite3 import Connection, Cursor
 from typing import Any
 
+import requests
+
 from par_infini_sweeper import __application_binary__
 from par_infini_sweeper.db_migrations import migrate_db_to_1_1, migrate_legacy_db
 from par_infini_sweeper.enums import GameDifficulty, GameMode
+from par_infini_sweeper.models import PostScoreRequest, PostScoreResult
 
 db_folder = Path(f"~/.{__application_binary__}").expanduser()
 db_path = db_folder / "game_data.sqlite"
@@ -245,3 +250,33 @@ def get_highscores(num_scores: int = 10) -> dict[GameMode, list[dict[str, Any]]]
 
             result[GameMode(h["mode"])].append(h)
         return result
+
+
+def get_internet_highscores() -> dict[GameMode, list[dict[str, Any]]]:
+    ret: dict[GameMode, list[dict[str, Any]]] = {}
+    for mode in GameMode:
+        ret[mode] = []
+
+    url = os.environ.get("PIM_LEADERBOARD_URL", "https://pim.pardev.net/score")
+    # yes i know this is bad...
+    headers = {"api-key": base64.b64decode("V29vdFdvb3RXb290").decode(encoding="utf-8")}
+
+    response = requests.request("GET", url, headers=headers, timeout=5).json()["scores"]
+    for item in response:
+        ret[GameMode(item["mode"])].append(item)
+
+    return ret
+
+
+def post_internet_score(score: PostScoreRequest) -> PostScoreResult:
+    url = os.environ.get("PIM_LEADERBOARD_URL", "https://pim.pardev.net/score")
+
+    headers = {
+        "Content-Type": "application/json",
+        # yes i know this is bad...
+        "api-key": base64.b64decode("V29vdFdvb3RXb290").decode(encoding="utf-8"),
+    }
+
+    return PostScoreResult.model_validate_json(
+        requests.request("POST", url, headers=headers, data=score.model_dump_json()).text
+    )

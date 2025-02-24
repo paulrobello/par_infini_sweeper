@@ -23,7 +23,7 @@ app_help:		# Show app help
 
 .PHONY: dev
 dev:	        # Run in dev mode
-	$(run) textual run --dev src/$(lib)/__main__.py
+	$(run) textual run --dev par_infini_sweeper.pim_app:PimApp
 
 .PHONY: demo-gif
 demo-gif:

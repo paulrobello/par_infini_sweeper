@@ -11,6 +11,7 @@ from textual.widget import Widget
 from par_infini_sweeper import db
 from par_infini_sweeper.db import get_user
 from par_infini_sweeper.enums import GameDifficulty, GameMode
+from par_infini_sweeper.utils import format_duration
 
 GridPos = tuple[int, int]
 
@@ -393,10 +394,7 @@ class GameState:
     @property
     def time_played(self) -> str:
         """Calculate the time played in a human-readable format."""
-        elapsed = self.duration
-        hours, remainder = divmod(elapsed, 3600)
-        minutes, seconds = divmod(remainder, 60)
-        return f"{str(hours).rjust(2, '0')}:{str(minutes).rjust(2, '0')}:{str(seconds).rjust(2, '0')}"
+        return format_duration(self.duration)
 
     def clear_highlighted(self) -> None:
         """Clear the highlighted flag for all cells in all subgrids."""
