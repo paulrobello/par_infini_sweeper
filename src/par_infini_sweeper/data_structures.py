@@ -290,6 +290,7 @@ class GameState:
         """
         self.user["id_token"] = ""
         self.user["access_token"] = ""
+        self.user["refresh_token"] = ""
         self.user["expires_at"] = 0
         with get_db_connection() as conn:
             cursor = conn.cursor()
