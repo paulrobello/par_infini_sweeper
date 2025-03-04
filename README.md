@@ -82,6 +82,10 @@ This requires 2 things:
 - Only your hashed email is stored on the server.
 - The port will only be opened for the duration of the login process.
 - After you have logged in and reserved your nickname, you can then submit your scores to the server for the current game mode and difficulty.
+- Nicknames may only contain the chars a-z A-Z 0-9 and . - _
+- Only one score per user / game mode / difficulty is stored.
+- You may submit scores for games that have not yet ended. If the score is higher than your existing one it will replace it.
+- Scores are not posted to the internet automatically, so make sure you post your score before starting a new game!
 
 See our [privacy policy](https://par-com.net/privacy_policy.html) for details on data handling.
 
@@ -145,6 +149,7 @@ uv run pim [OPTIONS]
   - Limit username and nickname to no more than 30 characters
   - Fix help dialog content display issues
   - Added internet leaderboard!
+  - Added `a` key to access authentication dialog for internet leaderboard
 - Version 0.2.10:
   - Updated package metadata
   - Removed some unnecessary dependencies
