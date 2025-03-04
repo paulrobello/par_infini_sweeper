@@ -127,7 +127,7 @@ class PimApp(App):
         self.push_screen(
             UrlDialog(
                 "OAUTH Login",
-                "If your browser does not automatically open, click copy and paste the url into a browser to start login.",
+                "If your browser does not automatically open, click Copy and paste the url into a browser to start login.",
                 event.url,
             )
         )
@@ -135,13 +135,14 @@ class PimApp(App):
     @on(WebServerStarted)
     def webserver_started(self, event: WebServerStarted):
         self._web_server = event.server
+        # stop the server if its still running after 5 minutes
+        self.set_timer(300, self.stop_webserver)
 
     @on(WebServerStopped)
     def webserver_stopped(self):
         self._web_server = None
 
-    @on(ExitApp)
-    def do_exit_app(self) -> None:
+    def stop_webserver(self) -> None:
         if self._web_server:
             try:
                 self._web_server.shutdown()
@@ -149,3 +150,7 @@ class PimApp(App):
                 pass
             finally:
                 self._web_server = None
+
+    @on(ExitApp)
+    def do_exit_app(self) -> None:
+        self.stop_webserver()
