@@ -24,6 +24,11 @@ class DifficultyDialog(ModalScreen[GameDifficulty | None]):
 		height: auto;
 		width: auto;
 		border: thick $secondary;
+		padding: 1;
+
+        Center {
+            width: 50;
+        }
 	}
 
 	DifficultyDialog > Vertical > * {
@@ -71,6 +76,10 @@ class DifficultyDialog(ModalScreen[GameDifficulty | None]):
     def compose(self) -> ComposeResult:
         """Compose the content of the dialog."""
         with Vertical():
+            yield Static(
+                "If you want to post your score to the internet,\nmake sure you do so before starting a new game!\n",
+            )
+
             with Center():
                 yield Static("Difficulty", classes="spaced")
                 yield Button("Easy", id="easy")
