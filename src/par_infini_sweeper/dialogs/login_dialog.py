@@ -135,7 +135,7 @@ class AuthDialog(ModalScreen[None]):
                             f"Difficulty: [#00FF00]{self.game_state.difficulty}[/]",
                             f"Solved: {self.game_state.num_solved} / {self.game_state.num_subgrids}",
                             f"Score: [#00FF00]{self.game_state.score()}[/]",
-                            f"Time: {self.game_state.time_played}",
+                            f"Time: {self.game_state.time_played}\n",
                         ]
                     )
                 )
@@ -179,7 +179,7 @@ class AuthDialog(ModalScreen[None]):
                 "New Nickname",
                 self.game_state.user["net_nickname"] or self.game_state.user["nickname"],
                 "Change Nickname",
-                "",
+                "Name may only contain letters, numbers and . - _  \n",
             )
         )
         if not new_nickname or len(new_nickname) < 2 or len(new_nickname) > 30:
