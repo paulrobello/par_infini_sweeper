@@ -14,7 +14,7 @@ import os
 from typing import Any
 
 from rich.console import ConsoleRenderable, RichCast
-from textual import work
+from textual import work, on
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
@@ -26,10 +26,13 @@ from par_infini_sweeper.data_structures import GameState
 from par_infini_sweeper.dialogs.difficulty_dialog import DifficultyDialog
 from par_infini_sweeper.dialogs.help_dialog import HelpDialog
 from par_infini_sweeper.dialogs.highscore_dialog import HighscoreDialog
+from par_infini_sweeper.dialogs.information import InformationDialog
 from par_infini_sweeper.dialogs.login_dialog import AuthDialog
 from par_infini_sweeper.dialogs.theme_dialog import ThemeDialog
+from par_infini_sweeper.dialogs.url_dialog import UrlDialog
 from par_infini_sweeper.enums import GameDifficulty
 from par_infini_sweeper.main_grid import MainGrid
+from par_infini_sweeper.messages import ShowURL
 
 
 class PimApp(App):
@@ -116,3 +119,13 @@ class PimApp(App):
         self.game_state.difficulty = difficulty
         self.game_state.new_game()
         self.sweeper_widget.action_center()
+
+    @on(ShowURL)
+    def show_url(self, event: ShowURL) -> None:
+        self.push_screen(
+            UrlDialog(
+                "OAUTH Login",
+                "If your browser does not automatically open, click copy and paste the url into a browser to start login.",
+                event.url
+            )
+        )

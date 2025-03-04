@@ -260,7 +260,7 @@ class GameState:
     @property
     def auth_client(self) -> OAuth2Session:
         if not self._auth_client or not self.is_logged_in():
-            self._auth_client = build_auth_client(self.user)
+            self._auth_client = build_auth_client(self.user, self.parent.app)
         return self._auth_client
 
     def is_logged_in(self, grace_time: int = 60) -> bool:

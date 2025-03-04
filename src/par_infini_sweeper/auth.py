@@ -8,8 +8,11 @@ import webbrowser
 from typing import Any
 
 from authlib.integrations.requests_client import OAuth2Session
+from textual.app import App
 
 from par_infini_sweeper import db
+from par_infini_sweeper.dialogs.information import InformationDialog
+from par_infini_sweeper.messages import ShowURL
 
 AUTH0_DOMAIN = os.environ.get("AUTH0_DOMAIN", "par-dev.us.auth0.com")
 AUTH0_CLIENT_ID = os.environ.get("AUTH0_CLIENT_ID", "79LqAgzljQjin3dihidWdmLSD7o4CpL5")
@@ -17,12 +20,13 @@ API_AUDIENCE = "PIM"
 REDIRECT_URI = "http://127.0.0.1:1999/oauth/callback"
 
 
-def build_auth_client(user: dict[str, Any]) -> OAuth2Session:
+def build_auth_client(user: dict[str, Any], app: App) -> OAuth2Session:
     """
     Returns a rest client that sends authorization bearer token with requests
 
     Args:
         user: (dict) User dictionary with token info
+        app: (App) Textual app
     """
     token_data = {
         "access_token": user["access_token"] or None,
@@ -66,10 +70,10 @@ def build_auth_client(user: dict[str, Any]) -> OAuth2Session:
             # we have an auth token and its not expired
             return client
 
-    return start_auth_server(client, user)
+    return start_auth_server(client, user, app)
 
 
-def start_auth_server(client: OAuth2Session, user: dict[str, Any]) -> OAuth2Session:
+def start_auth_server(client: OAuth2Session, user: dict[str, Any], app: App) -> OAuth2Session:
     def login() -> Any:
         """
         Initiate Auth0 OAuth login by redirecting the user to the Auth0 login page.
@@ -77,7 +81,8 @@ def start_auth_server(client: OAuth2Session, user: dict[str, Any]) -> OAuth2Sess
         authorization_url, state = client.create_authorization_url(
             f"https://{AUTH0_DOMAIN}/authorize", audience=API_AUDIENCE
         )
-        webbrowser.open(authorization_url)
+        if not webbrowser.open(authorization_url):
+            app.post_message(ShowURL(authorization_url))
 
     class OAuthCallbackHandler(http.server.SimpleHTTPRequestHandler):
         def do_GET(self):
