@@ -1,16 +1,21 @@
 from __future__ import annotations
 
+import os
 import random
 import time
 from typing import Any
 
 import orjson
+from authlib.integrations.requests_client import OAuth2Session
+from jose import jwt
 from textual.geometry import Offset
 from textual.widget import Widget
 
 from par_infini_sweeper import db
-from par_infini_sweeper.db import get_user
+from par_infini_sweeper.auth import build_auth_client
+from par_infini_sweeper.db import get_db_connection, get_user
 from par_infini_sweeper.enums import GameDifficulty, GameMode
+from par_infini_sweeper.models import ChangeNicknameRequest, ChangeNicknameResponse, PostScoreRequest, PostScoreResult
 from par_infini_sweeper.utils import format_duration
 
 GridPos = tuple[int, int]
@@ -237,6 +242,7 @@ class GameState:
         self.changed_subgrids: set[SubGrid] = set()
         self.paused: bool = False
         self.xray: bool = False
+        self._auth_client: OAuth2Session | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Return a dictionary representation of the game state."""
@@ -250,6 +256,77 @@ class GameState:
             "offset": (self.offset.x, self.offset.y),
             "subgrids": {f"{k[0]},{k[1]}": sg.to_dict() for k, sg in self.subgrids.items()},
         }
+
+    @property
+    def auth_client(self) -> OAuth2Session:
+        if not self._auth_client or not self.is_logged_in():
+            self._auth_client = build_auth_client(self.user)
+        return self._auth_client
+
+    def is_logged_in(self, grace_time: int = 60) -> bool:
+        """
+        Check if the user is logged in by checking the access token.
+        Args:
+            grace_time (int): Grace period in seconds for token expiration.
+        Returns:
+            bool: True if the user is logged in and the access token is valid, False otherwise.
+        """
+        if not self.user["access_token"]:
+            return False
+        try:
+            unverified_claims = jwt.get_unverified_claims(self.user["access_token"])
+            time_remaining = unverified_claims.get("exp", 0) - int(time.time())
+            # make sure we have a least grace_time seconds left on the token
+            is_expired = time_remaining > grace_time
+            return not is_expired or len(self.user["refresh_token"]) > 0
+        except Exception as _:
+            self.logout()
+            return False
+
+    def logout(self) -> None:
+        """
+        Clear the user's tokens from the database.
+        """
+        self.user["id_token"] = ""
+        self.user["access_token"] = ""
+        self.user["expires_at"] = 0
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """UPDATE users SET id_token = '', access_token = '', refresh_token = '', expires_at = 0 WHERE id = ?""",
+                (self.user["id"],),
+            )
+        self._auth_client = None
+
+    def save_user(self) -> None:
+        """
+        Save user data to the database.
+        """
+        db.save_user(self.user)
+
+    def change_internet_nickname(self, nickname: str) -> ChangeNicknameResponse:
+        """
+        Change nickname on the internet leaderboard.
+        Args:
+            nickname (str): New nickname to set.
+
+        Returns:
+            PostScoreResult: Result of the post operation.
+        """
+        if not self.is_logged_in():
+            raise Exception("User is not logged in")
+        url = os.environ.get("PIM_LEADERBOARD_URL", "https://pim.pardev.net") + "/nickname"
+
+        res = self.auth_client.post(url, data=ChangeNicknameRequest(nickname=nickname).model_dump_json()).json()
+        if "detail" in res:
+            raise Exception(res["detail"] or "Unknown server error")
+
+        result = ChangeNicknameResponse.model_validate(res)
+        if not result.status == "success":
+            raise Exception(result.message or "Unknown server error")
+        self.user["net_nickname"] = nickname
+        self.save_user()
+        return result
 
     def new_game(self) -> None:
         """Start a new game by resetting the game state."""
@@ -518,7 +595,7 @@ class GameState:
             self.game_over = True
             self.save()
             self.save_score()
-            self.parent.notify("Game Over! You hit a mine.", severity="error")
+            # self.parent.notify("Game Over! You hit a mine.", severity="error")
             self.parent.refresh()
             return
         # Generate any adjacent subgrids.
@@ -686,3 +763,30 @@ class GameState:
         else:
             color = "#FFFF00" if cell.highlighted else "#E0E0E0"
             return "[red]⚑ [/]" if cell.marked else f"[{color}]■ [/]"
+
+    def post_internet_score(self) -> PostScoreResult:
+        """
+        Post score to the internet leaderboard.
+        Args:
+            game_state (GameState): Game state containing user and score data.
+        Returns:
+            PostScoreResult: Result of the post operation.
+        """
+        if not self.is_logged_in():
+            raise Exception("User is not logged in")
+        url = os.environ.get("PIM_LEADERBOARD_URL", "https://pim.pardev.net") + "/score"
+
+        res = self.auth_client.post(
+            url,
+            data=PostScoreRequest(
+                mode=self.mode.value,
+                difficulty=self.difficulty.value,
+                score=self.score(),
+                duration=self.duration,
+            ).model_dump_json(),
+        ).json()
+
+        if "detail" in res:
+            raise Exception(res["detail"] or "Unknown server error")
+
+        return PostScoreResult.model_validate(res)

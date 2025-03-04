@@ -10,7 +10,7 @@ MainGrid {
 
 Screen {
     background: #121212;
-    Horizontal{
+    &>Horizontal{
         width: 1fr;
         height: 1fr;
     }

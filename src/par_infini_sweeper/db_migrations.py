@@ -17,13 +17,32 @@ def migrate_db_to_1_1(conn: Connection) -> None:
 
         if "duration" not in columns:
             cursor.execute("ALTER TABLE games ADD COLUMN duration INTEGER NOT NULL DEFAULT 0")
-            cursor.execute("UPDATE games SET duration = game_duration")
-            cursor.execute("ALTER TABLE games DROP COLUMN game_duration")
+            cursor.execute("UPDATE games SET duration = play_duration")
+            cursor.execute("ALTER TABLE games DROP COLUMN play_duration")
 
         if "mode" not in columns:
             cursor.execute("ALTER TABLE games ADD COLUMN mode TEXT NOT NULL DEFAULT 'infinite'")
             cursor.execute("UPDATE games SET mode = game_mode")
             cursor.execute("ALTER TABLE games DROP COLUMN game_mode")
+
+        cursor.execute("PRAGMA table_info(users)")
+        columns = [col[1] for col in cursor.fetchall()]
+        if "net_nickname" not in columns:
+            cursor.execute("ALTER TABLE users ADD COLUMN net_nickname TEXT DEFAULT ''")
+            cursor.execute("UPDATE users SET net_nickname = ''")
+
+        if "id_token" not in columns:
+            cursor.execute("ALTER TABLE users ADD COLUMN id_token TEXT DEFAULT ''")
+            cursor.execute("UPDATE users SET id_token = ''")
+        if "access_token" not in columns:
+            cursor.execute("ALTER TABLE users ADD COLUMN access_token TEXT DEFAULT ''")
+            cursor.execute("UPDATE users SET access_token = ''")
+        if "refresh_token" not in columns:
+            cursor.execute("ALTER TABLE users ADD COLUMN refresh_token TEXT DEFAULT ''")
+            cursor.execute("UPDATE users SET refresh_token = ''")
+        if "expires_at" not in columns:
+            cursor.execute("ALTER TABLE users ADD COLUMN expires_at INTEGER DEFAULT 0")
+            cursor.execute("UPDATE users SET expires_at = 0")
 
         cursor.execute("UPDATE pim_db_info set version = ?", ("1.1",))
 

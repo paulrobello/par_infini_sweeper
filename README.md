@@ -24,11 +24,13 @@ Infinite Minesweeper TUI. Play a game of minesweeper with infinite board size!
 - Python
 - Textual
 - Sqlite3
+- OAuth2 (For Internet Leaderboard)
 
 ## Key Features:
 
 * Infinite board size
 * Local high scores
+* Internet high scores
 * Auto saves and can be resumed
 
 ## Objective
@@ -70,6 +72,18 @@ Your score is the sum of all mines in the solved sub grids.
 
 All data for the application is stored in a sqlite3 database located in `~/.pim/game_data.sqlite`  
 The database is backed up daily to `~/.pim/game_data.sqlite.bak`  
+
+## Internet Leaderboard
+
+To use the internet leaderboard you must login to the server via a social provider such as google or facebook.  
+This requires 2 things:
+1. The game must listen on port 1999 for the authentication callback. (This may trigger a firewall warning which you must accept if you wish to continue)
+2. The game must launch a browser so you can login.
+- Only your hashed email is stored on the server.
+- The port will only be opened for the duration of the login process.
+- After you have logged in and reserved your nickname, you can then submit your scores to the server for the current game mode and difficulty.
+
+See our [privacy policy](https://par-com.net/privacy_policy.html) for details on data handling.
 
 ## Prerequisites
 
@@ -122,14 +136,14 @@ uv run pim [OPTIONS]
 
 ## Roadmap
 
-- Global Leaderboard
 - More game modes
 - Optimize for more performance
 
 ## Whats New
 - Version 0.3.0:
   - Fix server mode not using other parameters such as user and nick
-  - Limit username and nickname to no more than 20 characters
+  - Limit username and nickname to no more than 30 characters
+  - Fix help dialog content display issues
   - Added internet leaderboard!
 - Version 0.2.10:
   - Updated package metadata

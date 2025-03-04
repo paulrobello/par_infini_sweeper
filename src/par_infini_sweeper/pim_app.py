@@ -26,6 +26,7 @@ from par_infini_sweeper.data_structures import GameState
 from par_infini_sweeper.dialogs.difficulty_dialog import DifficultyDialog
 from par_infini_sweeper.dialogs.help_dialog import HelpDialog
 from par_infini_sweeper.dialogs.highscore_dialog import HighscoreDialog
+from par_infini_sweeper.dialogs.login_dialog import AuthDialog
 from par_infini_sweeper.dialogs.theme_dialog import ThemeDialog
 from par_infini_sweeper.enums import GameDifficulty
 from par_infini_sweeper.main_grid import MainGrid
@@ -50,6 +51,7 @@ class PimApp(App):
         Binding(key="n", action="new_game", description="New Game"),
         Binding(key="h", action="highscores", description="Highscores"),
         Binding(key="t", action="change_theme", description="Change Theme"),
+        Binding(key="a", action="auth", description="Authentication"),
         Binding(key="q", action="quit", description="Quit"),
         Binding(key="f1", action="help", description="Help", show=True),
     ]
@@ -93,7 +95,11 @@ class PimApp(App):
 
     def action_highscores(self) -> None:
         """Display the highscores for each game mode."""
-        self.app.push_screen(HighscoreDialog())
+        self.app.push_screen(HighscoreDialog(self.game_state))
+
+    def action_auth(self) -> None:
+        """Display the auth dialog."""
+        self.app.push_screen(AuthDialog(self.game_state))
 
     def set_debug(self, text: ConsoleRenderable | RichCast | str | SupportsVisual | Visual) -> None:
         self.debug_panel.update(text)

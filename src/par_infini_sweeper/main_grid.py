@@ -9,6 +9,7 @@ from textual.widget import Widget
 from textual.widgets import Static
 
 from par_infini_sweeper.data_structures import GameState, GridPos
+from par_infini_sweeper.dialogs.highscore_dialog import HighscoreDialog
 from par_infini_sweeper.dialogs.information import InformationDialog
 
 
@@ -210,6 +211,8 @@ class MainGrid(Widget, can_focus=True):
         self.game_state.save()
         self.refresh()
         if self.game_state.game_over:
+            self.app.push_screen(HighscoreDialog(self.game_state))
+
             self.app.push_screen(
                 InformationDialog("Game Over", f"[red]You hit a mine.[/]\nScore: [yellow]{self.game_state.score()}")
             )

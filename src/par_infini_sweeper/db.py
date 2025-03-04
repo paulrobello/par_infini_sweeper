@@ -10,7 +10,10 @@ import requests
 from par_infini_sweeper import __application_binary__
 from par_infini_sweeper.db_migrations import migrate_db_to_1_1, migrate_legacy_db
 from par_infini_sweeper.enums import GameDifficulty, GameMode
-from par_infini_sweeper.models import PostScoreRequest, PostScoreResult
+from par_infini_sweeper.models import (
+    ScoreData,
+    ScoreDataResponse,
+)
 
 db_folder = Path(f"~/.{__application_binary__}").expanduser()
 db_path = db_folder / "game_data.sqlite"
@@ -64,34 +67,26 @@ def init_db(conn: Connection, username: str = "user", nickname: str | None = Non
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")
         users_exists = cursor.fetchone() is not None
 
-        # update usernames and nicknames to be no longer than 20 characters
-        cursor.execute("UPDATE users SET username = substr(username, 1, 20), nickname = substr(nickname, 1, 20)")
-
-        # If users table exists but pim_db_info does not, run migrate_db
-        if users_exists and not pim_db_info_exists:
-            migrate_legacy_db(conn)
-
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS pim_db_info (
                 version TEXT PRIMARY KEY
             )
         """)
-        cursor.execute("SELECT version FROM pim_db_info")
-        db_version = cursor.fetchone()
-        if db_version:
-            db_version = db_version[0]
-        if db_version is None:
-            db_version = "1.0"
-            cursor.execute("INSERT INTO pim_db_info (version) VALUES (?)", (db_version,))
-        if db_version == "1.0":
-            migrate_db_to_1_1(conn)
-            db_version = "1.1"
+
+        # update usernames and nicknames to be no longer than 30 characters
+        if users_exists:
+            cursor.execute("UPDATE users SET username = substr(username, 1, 30), nickname = substr(nickname, 1, 30)")
 
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT UNIQUE NOT NULL,
                 nickname TEXT UNIQUE NOT NULL,
+                net_nickname TEXT NOT NULL DEFAULT '',
+                id_token TEXT DEFAULT '',
+                access_token TEXT DEFAULT '',
+                refresh_token TEXT DEFAULT '',
+                expires_at INTEGER NOT NULL DEFAULT 0,
                 created_ts TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
@@ -137,6 +132,22 @@ def init_db(conn: Connection, username: str = "user", nickname: str | None = Non
                 PRIMARY KEY (game_id, user_id, sub_grid_id)
             )
         """)
+
+        # If users table exists but pim_db_info does not, run migrate_db
+        if users_exists and not pim_db_info_exists:
+            migrate_legacy_db(conn)
+
+        cursor.execute("SELECT version FROM pim_db_info")
+        db_version = cursor.fetchone()
+        if db_version:
+            db_version = db_version[0]
+        if db_version is None:
+            db_version = "1.0"
+            cursor.execute("INSERT INTO pim_db_info (version) VALUES (?)", (db_version,))
+        if db_version == "1.0":
+            migrate_db_to_1_1(conn)
+            db_version = "1.1"
+
         # Create default user "user" if not exists.
         cursor.execute("SELECT id FROM users WHERE username = ?", (username,))
         if cursor.fetchone() is None:
@@ -247,36 +258,49 @@ def get_highscores(num_scores: int = 10) -> dict[GameMode, list[dict[str, Any]]]
         for h in highscores:
             if h["mode"] not in result:
                 result[GameMode(h["mode"])] = []
-
             result[GameMode(h["mode"])].append(h)
         return result
 
 
-def get_internet_highscores() -> dict[GameMode, list[dict[str, Any]]]:
-    ret: dict[GameMode, list[dict[str, Any]]] = {}
+def get_internet_highscores() -> dict[GameMode, list[ScoreData]]:
+    ret: dict[GameMode, list[ScoreData]] = {}
     for mode in GameMode:
         ret[mode] = []
 
-    url = os.environ.get("PIM_LEADERBOARD_URL", "https://pim.pardev.net/score")
-    # yes i know this is bad...
+    url = os.environ.get("PIM_LEADERBOARD_URL", "https://pim.pardev.net") + "/score"
+    # yes i know this is bad, but it helps keep random bots from hitting the api
     headers = {"api-key": base64.b64decode("V29vdFdvb3RXb290").decode(encoding="utf-8")}
-
-    response = requests.request("GET", url, headers=headers, timeout=5).json()["scores"]
-    for item in response:
-        ret[GameMode(item["mode"])].append(item)
+    res = requests.request("GET", url, headers=headers, timeout=5).json()
+    if "detail" in res:
+        raise Exception(res["detail"] or "Unknown server error")
+    response: ScoreDataResponse = ScoreDataResponse.model_validate(res)
+    if response.status == "error":
+        raise Exception(response.message or "Unknown server error")
+    for item in response.scores:
+        ret[GameMode(item.mode)].append(item)
 
     return ret
 
 
-def post_internet_score(score: PostScoreRequest) -> PostScoreResult:
-    url = os.environ.get("PIM_LEADERBOARD_URL", "https://pim.pardev.net/score")
-
-    headers = {
-        "Content-Type": "application/json",
-        # yes i know this is bad...
-        "api-key": base64.b64decode("V29vdFdvb3RXb290").decode(encoding="utf-8"),
-    }
-
-    return PostScoreResult.model_validate_json(
-        requests.request("POST", url, headers=headers, data=score.model_dump_json()).text
-    )
+def save_user(user: dict[str, Any]) -> None:
+    """
+    Save user data to the database.
+    Args:
+        user (dict[str, Any]): User data containing id_token and access_token.
+    """
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """UPDATE users
+            SET id_token = ?, access_token = ?, refresh_token = ?, expires_at = ?, nickname=?, net_nickname=?
+            WHERE id = ?""",
+            (
+                user["id_token"],
+                user["access_token"],
+                user["refresh_token"],
+                user["expires_at"],
+                user["nickname"],
+                user["net_nickname"],
+                user["id"],
+            ),
+        )
