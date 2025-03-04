@@ -11,7 +11,7 @@ from authlib.integrations.requests_client import OAuth2Session
 from textual.app import App
 
 from par_infini_sweeper import db
-from par_infini_sweeper.messages import ShowURL
+from par_infini_sweeper.messages import ShowURL, WebServerStarted, WebServerStopped
 
 AUTH0_DOMAIN = os.environ.get("AUTH0_DOMAIN", "par-dev.us.auth0.com")
 AUTH0_CLIENT_ID = os.environ.get("AUTH0_CLIENT_ID", "79LqAgzljQjin3dihidWdmLSD7o4CpL5")
@@ -97,7 +97,6 @@ def start_auth_server(client: OAuth2Session, user: dict[str, Any], app: App) -> 
                 token = client.fetch_token(
                     f"https://{AUTH0_DOMAIN}/oauth/token",
                     authorization_response=authorization_response,
-                    # client_secret=AUTH0_CLIENT_SECRET,
                 )
                 user["id_token"] = token.get("id_token")
                 user["access_token"] = token.get("access_token")
@@ -120,7 +119,11 @@ def start_auth_server(client: OAuth2Session, user: dict[str, Any], app: App) -> 
             self.server.shutdown()
 
     with socketserver.TCPServer(("127.0.0.1", 1999), OAuthCallbackHandler) as httpd:
-        login()
-        print("Serving on port 1999")
-        httpd.serve_forever()
+        try:
+            app.post_message(WebServerStarted(httpd))
+            login()
+            httpd.serve_forever()
+        finally:
+            app.post_message(WebServerStopped())
+
     return client

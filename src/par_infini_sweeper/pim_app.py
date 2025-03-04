@@ -11,6 +11,7 @@ Only in the initial subgrid may any cell be clicked; in other subgrids only cell
 from __future__ import annotations
 
 import os
+import socketserver
 from typing import Any
 
 from rich.console import ConsoleRenderable, RichCast
@@ -18,6 +19,7 @@ from textual import on, work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
+from textual.messages import ExitApp
 from textual.visual import SupportsVisual, Visual
 from textual.widgets import Footer, Header, Static
 
@@ -31,7 +33,7 @@ from par_infini_sweeper.dialogs.theme_dialog import ThemeDialog
 from par_infini_sweeper.dialogs.url_dialog import UrlDialog
 from par_infini_sweeper.enums import GameDifficulty
 from par_infini_sweeper.main_grid import MainGrid
-from par_infini_sweeper.messages import ShowURL
+from par_infini_sweeper.messages import ShowURL, WebServerStarted, WebServerStopped
 
 
 class PimApp(App):
@@ -71,6 +73,7 @@ class PimApp(App):
         self.debug_panel = Static("Debug", id="debug")
         self.game_state = GameState.load(None, user_name, nickname)
         self.sweeper_widget = MainGrid(self.game_state, self.info, self.debug_panel)
+        self._web_server: socketserver.TCPServer | None = None
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
@@ -128,3 +131,21 @@ class PimApp(App):
                 event.url,
             )
         )
+
+    @on(WebServerStarted)
+    def webserver_started(self, event: WebServerStarted):
+        self._web_server = event.server
+
+    @on(WebServerStopped)
+    def webserver_stopped(self):
+        self._web_server = None
+
+    @on(ExitApp)
+    def do_exit_app(self) -> None:
+        if self._web_server:
+            try:
+                self._web_server.shutdown()
+            except Exception as _:
+                pass
+            finally:
+                self._web_server = None
