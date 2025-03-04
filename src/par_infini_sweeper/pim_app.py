@@ -14,7 +14,7 @@ import os
 from typing import Any
 
 from rich.console import ConsoleRenderable, RichCast
-from textual import work, on
+from textual import on, work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
@@ -26,7 +26,6 @@ from par_infini_sweeper.data_structures import GameState
 from par_infini_sweeper.dialogs.difficulty_dialog import DifficultyDialog
 from par_infini_sweeper.dialogs.help_dialog import HelpDialog
 from par_infini_sweeper.dialogs.highscore_dialog import HighscoreDialog
-from par_infini_sweeper.dialogs.information import InformationDialog
 from par_infini_sweeper.dialogs.login_dialog import AuthDialog
 from par_infini_sweeper.dialogs.theme_dialog import ThemeDialog
 from par_infini_sweeper.dialogs.url_dialog import UrlDialog
@@ -126,6 +125,6 @@ class PimApp(App):
             UrlDialog(
                 "OAUTH Login",
                 "If your browser does not automatically open, click copy and paste the url into a browser to start login.",
-                event.url
+                event.url,
             )
         )

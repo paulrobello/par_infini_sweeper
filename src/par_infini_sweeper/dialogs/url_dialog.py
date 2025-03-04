@@ -10,7 +10,6 @@ from textual.containers import Center, Vertical
 from textual.screen import ModalScreen
 from textual.visual import SupportsVisual
 from textual.widgets import Button, Static
-from textual.widgets.button import ButtonVariant
 
 
 class UrlDialog(ModalScreen[None]):
@@ -56,7 +55,6 @@ class UrlDialog(ModalScreen[None]):
         self._title = title
         self._message = message
         self._url = url
-
 
     def compose(self) -> ComposeResult:
         """Compose the content of the modal dialog."""

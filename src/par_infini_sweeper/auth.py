@@ -11,7 +11,6 @@ from authlib.integrations.requests_client import OAuth2Session
 from textual.app import App
 
 from par_infini_sweeper import db
-from par_infini_sweeper.dialogs.information import InformationDialog
 from par_infini_sweeper.messages import ShowURL
 
 AUTH0_DOMAIN = os.environ.get("AUTH0_DOMAIN", "par-dev.us.auth0.com")

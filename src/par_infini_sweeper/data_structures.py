@@ -260,6 +260,7 @@ class GameState:
     @property
     def auth_client(self) -> OAuth2Session:
         if not self._auth_client or not self.is_logged_in():
+            assert self.parent and self.parent.app
             self._auth_client = build_auth_client(self.user, self.parent.app)
         return self._auth_client
 
