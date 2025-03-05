@@ -240,6 +240,7 @@ class GameState:
         self.num_grids_saved: int = 0
         self.highlighted_cells: set[Cell] = set()
         self.changed_subgrids: set[SubGrid] = set()
+        self.mouse_grid: SubGrid | None = None
         self.paused: bool = False
         self.xray: bool = False
         self._auth_client: OAuth2Session | None = None
@@ -765,26 +766,35 @@ class GameState:
         """
         cell: Cell | None = self.global_to_cell(gx, gy)
 
+        # set background based on checker pattern
+        sg_coord: GridPos = (gx // 8, gy // 8)
+        bg_color = "#000000" if (sg_coord[0] + sg_coord[1]) % 2 == 0 else "#111111"
+
+
         if not cell:
-            return "[#C0C0C0]? [/]"  # placeholder for not-yet generated subgrid
+            return f"[#C0C0C0 on {bg_color}]? [/]"  # placeholder for not-yet generated subgrid
 
         if self.xray or cell.uncovered:
             if cell.is_mine:
                 if self.xray and cell.marked:
-                    return "[red]⚑ [/]"
-                return "[red]💣[/]"
+                    return f"[#FF0000 on {bg_color}]⚑ [/]"
+                return f"[#FF0000 on {bg_color}]💣[/]"
             count: tuple[int, int] = self.count_adjacent_flags_mines(gx, gy)
             if cell.parent.solved:
                 color = "#A0A0A0"
             else:
-                color = "#FFFF00" if cell.highlighted else count_to_color.get(count[1], "#000000")
+                color = "#FFFF00" if cell.highlighted else count_to_color.get(count[1], "#FFFFFF")
             if cell.parent.solved:
                 if count[1] == 0:
-                    return f"[{color}]. [/]"
-            return f"[{color}]{count[1]} [/]" if count[1] > 0 else "  "
+                    return f"[{color} on {bg_color}]. [/]"
+            if count[1] > 0:
+                return f"[{color} on {bg_color}]{count[1]} [/]"
+            return f"[#C0C0C0 on {bg_color}]  [/]"
         else:
+            if cell.marked:
+                return f"[#FF0000 on {bg_color}]⚑ [/]"
             color = "#FFFF00" if cell.highlighted else "#E0E0E0"
-            return "[red]⚑ [/]" if cell.marked else f"[{color}]■ [/]"
+            return f"[{color} on {bg_color}]■ [/]"
 
     def post_internet_score(self) -> PostScoreResult:
         """

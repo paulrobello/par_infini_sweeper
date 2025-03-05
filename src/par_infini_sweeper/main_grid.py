@@ -36,6 +36,9 @@ class MainGrid(Widget, can_focus=True):
         self.is_dragging: bool = False
         self.debug = False
         self.debug_panel.display = self.debug
+        self.mouse_pos: GridPos = 0, 0
+        self.mouse_global_grid_coord: GridPos = 0, 0
+        self.sg_coord: GridPos = (self.mouse_global_grid_coord[0] // 8, self.mouse_global_grid_coord[1] // 8)
 
     def on_mount(self) -> None:
         if self.game_state.offset.is_origin:
@@ -113,7 +116,7 @@ class MainGrid(Widget, can_focus=True):
         await self.app.push_screen_wait(InformationDialog("Paused", "Press ESC to continue"))
         self.game_state.paused = False
 
-    def mouse_to_grid(self, event: MouseEvent) -> GridPos:
+    def mouse_to_global_grid_coords(self, event: MouseEvent) -> GridPos:
         """
         Convert mouse event coordinates to global cell coordinates.
 
@@ -138,7 +141,7 @@ class MainGrid(Widget, can_focus=True):
         """
         if self.is_dragging:
             return
-        gx, gy = self.mouse_to_grid(event)
+        gx, gy = self.mouse_to_global_grid_coords(event)
         if event.button == 1 and not (event.shift or event.ctrl):
             self.game_state.reveal_cell(gx, gy)
             self.game_state.first_click = False
@@ -164,10 +167,10 @@ class MainGrid(Widget, can_focus=True):
             event (MouseDown): The mouse down event
         """
         self.adjust_mouse_pos(event)
-        self.drag_start = (event.x, event.y)
+        self.drag_start = event.x, event.y
 
         if event.button == 1 and (event.shift or event.ctrl):
-            gx, gy = self.mouse_to_grid(event)
+            gx, gy = self.mouse_to_global_grid_coords(event)
             self.game_state.highlight_neighbors(gx, gy)
 
     def on_mouse_move(self, event: MouseMove) -> None:
@@ -178,7 +181,9 @@ class MainGrid(Widget, can_focus=True):
             event (MouseMove): The mouse move event
         """
         self.adjust_mouse_pos(event)
-
+        self.mouse_pos = event.x, event.y
+        self.mouse_global_grid_coord = self.mouse_to_global_grid_coords(event)
+        self.sg_coord = (self.mouse_global_grid_coord[0] // 8, self.mouse_global_grid_coord[1] // 8)
         if self.drag_start is not None:
             dx: int = event.x - self.drag_start[0]
             dy: int = event.y - self.drag_start[1]

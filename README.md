@@ -144,6 +144,8 @@ uv run pim [OPTIONS]
 - Optimize for more performance
 
 ## Whats New
+- Version 0.3.3:
+  - Better coloring of subgrids
 - Version 0.3.2:
   - Ensure 1st click is always safe
 - Version 0.3.1:
