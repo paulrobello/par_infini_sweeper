@@ -150,6 +150,7 @@ uv run pim [OPTIONS]
 - Version 0.3.3:
   - Subgrids now have subtle checker background
   - Added `S` key to toggle subgrid highlighting
+  - Fixed bug where hitting mine on 1st click after reloading game did not end game
 - Version 0.3.2:
   - Ensure 1st click is always safe
 - Version 0.3.1:

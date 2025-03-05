@@ -139,7 +139,6 @@ class SubGrid:
         self.cells: list[list[Cell]] = self.generate_cells(difficulty) if difficulty else []
         self.solved: bool = False
         self._parent: GameState = parent
-        self.highlighted: bool = False
 
     @property
     def parent(self) -> GameState:
@@ -445,6 +444,13 @@ class GameState:
                 state.subgrids[coords] = sg
                 if sg.solved:
                     state.num_solved += 1
+                for row in sg.cells:
+                    if not state.first_click:
+                        break
+                    for cell in row:
+                        if cell.uncovered:
+                            state.first_click = False
+                            break
                 row = cursor.fetchone()
 
         return state
@@ -629,18 +635,16 @@ class GameState:
         if not cell or cell.marked or cell.uncovered:
             return
 
-        # Uncover the cell only if we are not in reveal surrounding mode
         cell.uncovered = True
         if cell.uncovered and cell.is_mine:
             if not self.first_click:
                 self.game_over = True
                 self.save()
                 self.save_score()
-                # self.parent.notify("Game Over! You hit a mine.", severity="error")
                 self.parent.refresh()
                 return
             cell.is_mine = False
-            # move mine to a surounding cell
+            # move mine to a surrounding cell
             border_cell: Cell | None = None
             for dx in [-1, 0, 1]:
                 if border_cell:

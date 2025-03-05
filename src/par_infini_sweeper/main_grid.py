@@ -18,7 +18,7 @@ class MainGrid(Widget, can_focus=True):
 
     BINDINGS = [
         Binding(key="o", action="origin", description="Origin"),
-        Binding(key="c", action="center", description="Center"),
+        Binding(key="c", action="center", description="Center", show=False),
         Binding(key="d", action="debug", description="Debug", show=False),
         Binding(key="p", action="pause", description="Pause"),
         Binding(key="s", action="subgrid_highlight", description="Subgrid Highlight"),
