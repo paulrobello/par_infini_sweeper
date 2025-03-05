@@ -141,6 +141,7 @@ class MainGrid(Widget, can_focus=True):
         gx, gy = self.mouse_to_grid(event)
         if event.button == 1 and not (event.shift or event.ctrl):
             self.game_state.reveal_cell(gx, gy)
+            self.game_state.first_click = False
         elif event.button == 1 and (event.shift or event.ctrl):
             self.game_state.toggle_mark(gx, gy, True)
 

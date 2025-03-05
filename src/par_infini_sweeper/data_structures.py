@@ -243,6 +243,7 @@ class GameState:
         self.paused: bool = False
         self.xray: bool = False
         self._auth_client: OAuth2Session | None = None
+        self.first_click: bool = True
 
     def to_dict(self) -> dict[str, Any]:
         """Return a dictionary representation of the game state."""
@@ -255,6 +256,7 @@ class GameState:
             "duration": self.duration,
             "offset": (self.offset.x, self.offset.y),
             "subgrids": {f"{k[0]},{k[1]}": sg.to_dict() for k, sg in self.subgrids.items()},
+            "first_click": self.first_click,
         }
 
     @property
@@ -345,6 +347,7 @@ class GameState:
         self.clear_highlighted()
         self.clear_changed()
         self.xray = False
+        self.first_click = True
 
         conn = db.get_db_connection()
         with conn:
@@ -594,12 +597,29 @@ class GameState:
         # Uncover the cell only if we are not in reveal surrounding mode
         cell.uncovered = True
         if cell.uncovered and cell.is_mine:
-            self.game_over = True
-            self.save()
-            self.save_score()
-            # self.parent.notify("Game Over! You hit a mine.", severity="error")
-            self.parent.refresh()
-            return
+            if not self.first_click:
+                self.game_over = True
+                self.save()
+                self.save_score()
+                # self.parent.notify("Game Over! You hit a mine.", severity="error")
+                self.parent.refresh()
+                return
+            cell.is_mine = False
+            # move mine to a surounding cell
+            border_cell: Cell | None = None
+            for dx in [-1, 0, 1]:
+                if border_cell:
+                    break
+                for dy in [-1, 0, 1]:
+                    if dx == 0 and dy == 0:
+                        continue
+                    nx: int = gx + dx
+                    ny: int = gy + dy
+                    border_cell: Cell | None = self.global_to_cell(nx, ny, True)
+                    if border_cell and not border_cell.is_mine:
+                        border_cell.is_mine = True
+                        break
+
         # Generate any adjacent subgrids.
         for dx in [-1, 0, 1]:
             for dy in [-1, 0, 1]:

@@ -35,7 +35,7 @@ Infinite Minesweeper TUI. Play a game of minesweeper with infinite board size!
 
 ## Objective
 The goal of the game is to uncover all the cells that do not contain mines. 
-If you uncover a mine, you lose the game. 
+If you uncover a mine, you lose the game. Your 1st click is always safe.
 If you uncover a cell that is not a mine, it will show a number indicating how many mines are in the neighboring cells. 
 Use this information to determine which cells are safe to uncover.
 
@@ -60,7 +60,7 @@ Use this information to determine which cells are safe to uncover.
 ## Scoring
 
 The main grid consists of 8x8 sub grids.  
-Depending the difficulty level, the number of mines in each sub grid will vary.  
+When all cells that are not mines in a sub grid are uncovered the sub grid is marked solved turns a darker gray and flags are placed on any mines that are not already flagged.
 * Easy: 8 mines
 * Medium: 12 mines
 * Hard: 16 mines
@@ -144,6 +144,8 @@ uv run pim [OPTIONS]
 - Optimize for more performance
 
 ## Whats New
+- Version 0.3.2:
+  - Ensure 1st click is always safe
 - Version 0.3.1:
   - Use XDG specification for data paths
 - Version 0.3.0:
