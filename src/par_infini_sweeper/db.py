@@ -19,6 +19,10 @@ from par_infini_sweeper.models import (
 db_folder_old = Path(f"~/.{__application_binary__}").expanduser()
 db_folder = xdg_data_home() / __application_binary__
 
+if not db_folder.parent.exists():
+    db_folder.parent.mkdir(parents=True, exist_ok=True)
+
+
 if db_folder_old.exists() and not db_folder.exists():
     db_folder = db_folder_old.rename(db_folder)
 
