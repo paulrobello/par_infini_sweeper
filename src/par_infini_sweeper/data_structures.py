@@ -251,6 +251,8 @@ class GameState:
         self.mouse_global_grid_coord: GridPos = 0, 0
         self.mouse_sg_coord: GridPos = (self.mouse_global_grid_coord[0] // 8, self.mouse_global_grid_coord[1] // 8)
         self.shift_pressed: bool = False
+        self.ctrl_pressed: bool = False
+        self.highlighted_subgrid: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         """Return a dictionary representation of the game state."""
@@ -285,10 +287,12 @@ class GameState:
         self.mouse_pos = event.x, event.y
         self.mouse_global_grid_coord = self.mouse_to_global_grid_coords(event)
         self.mouse_sg_coord = (self.mouse_global_grid_coord[0] // 8, self.mouse_global_grid_coord[1] // 8)
-        if self.parent:
-            if event.shift or event.shift != self.shift_pressed:
-                self.parent.refresh()
+
+        if self.parent and self.highlighted_subgrid:
+            self.parent.refresh()
+
         self.shift_pressed = event.shift
+        self.ctrl_pressed = event.ctrl
 
     @property
     def auth_client(self) -> OAuth2Session:
@@ -799,7 +803,7 @@ class GameState:
         # set background based on checker pattern
         sg_coord: GridPos = (gx // 8, gy // 8)
         bg_color = "#000000" if (sg_coord[0] + sg_coord[1]) % 2 == 0 else "#111111"
-        if self.mouse_sg_coord == sg_coord and self.shift_pressed:
+        if self.mouse_sg_coord == sg_coord and self.highlighted_subgrid:
             bg_color = "#888800"
 
         if not cell:

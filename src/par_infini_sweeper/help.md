@@ -14,13 +14,13 @@ Use this information to determine which cells are safe to uncover.
 * Shift or Ctrl + Left-click on an uncovered cell it will uncover all neighboring cells.
   * As a safety you must have same number of flags as mines in the neighboring cells.
 * Drag to pan the board.
-* Shift + mouse move will highlight current subgrid
 * Keys:
   * `F1` Help.
   * `N` New game.
   * `O` Move view to origin.
   * `C` Move view to board center (computed as center of exposed sub grids).
   * `P` Pause.
+  * `S` Toggle highlighting of sub grid under the mouse
   * `H` Highscores.
   * `T` Change theme.
   * `Q` Quit.

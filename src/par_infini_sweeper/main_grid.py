@@ -21,6 +21,7 @@ class MainGrid(Widget, can_focus=True):
         Binding(key="c", action="center", description="Center"),
         Binding(key="d", action="debug", description="Debug", show=False),
         Binding(key="p", action="pause", description="Pause"),
+        Binding(key="s", action="subgrid_highlight", description="Subgrid Highlight"),
         # Binding(key="ctrl+d", action="xray", description="X-Ray", show=False),
     ]
     ALLOW_SELECT = False
@@ -210,3 +211,8 @@ class MainGrid(Widget, can_focus=True):
             self.app.push_screen(
                 InformationDialog("Game Over", f"[red]You hit a mine.[/]\nScore: [yellow]{self.game_state.score()}")
             )
+
+    def action_subgrid_highlight(self) -> None:
+        self.game_state.highlighted_subgrid = not self.game_state.highlighted_subgrid
+        if not self.game_state.highlighted_subgrid:
+            self.refresh()
