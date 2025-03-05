@@ -144,6 +144,8 @@ uv run pim [OPTIONS]
 - Optimize for more performance
 
 ## Whats New
+- Version 0.3.1:
+  - Use XDG specification for data paths
 - Version 0.3.0:
   - Fix server mode not using other parameters such as user and nick
   - Limit username and nickname to no more than 30 characters

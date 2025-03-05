@@ -6,6 +6,7 @@ from sqlite3 import Connection, Cursor
 from typing import Any
 
 import requests
+from xdg_base_dirs import xdg_data_home
 
 from par_infini_sweeper import __application_binary__
 from par_infini_sweeper.db_migrations import migrate_db_to_1_1, migrate_legacy_db
@@ -15,7 +16,13 @@ from par_infini_sweeper.models import (
     ScoreDataResponse,
 )
 
-db_folder = Path(f"~/.{__application_binary__}").expanduser()
+db_folder_old = Path(f"~/.{__application_binary__}").expanduser()
+db_folder = xdg_data_home() / __application_binary__
+
+if db_folder_old.exists() and not db_folder.exists():
+    db_folder = db_folder_old.rename(db_folder)
+
+
 db_path = db_folder / "game_data.sqlite"
 db_bak_path = db_folder / "game_data.sqlite.bak"
 

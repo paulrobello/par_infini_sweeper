@@ -49,6 +49,7 @@ dependencies = [
     "flask[async]>=3.1.0",
     "flask-cors>=5.0.1",
     "authlib>=1.5.0",
+    "xdg-base-dirs>=6.0.2",
 ]
 packages = [
     "src/par_infini_sweeper",
