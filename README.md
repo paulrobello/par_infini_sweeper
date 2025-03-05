@@ -70,8 +70,8 @@ Your score is the sum of all mines in the solved sub grids.
 
 ## Storage
 
-All data for the application is stored in a sqlite3 database located in `~/.pim/game_data.sqlite`  
-The database is backed up daily to `~/.pim/game_data.sqlite.bak`  
+All data for the application is stored in a sqlite3 database located in $XDG_DATA_HOME/pim or appropriate folder for your OS  
+The database is backed up each day you play to `game_data.sqlite.bak`  
 
 ## Internet Leaderboard
 
