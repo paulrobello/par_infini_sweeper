@@ -8,6 +8,7 @@ from typing import Any
 import orjson
 from authlib.integrations.requests_client import OAuth2Session
 from jose import jwt
+from textual.events import MouseEvent
 from textual.geometry import Offset
 from textual.widget import Widget
 
@@ -138,6 +139,7 @@ class SubGrid:
         self.cells: list[list[Cell]] = self.generate_cells(difficulty) if difficulty else []
         self.solved: bool = False
         self._parent: GameState = parent
+        self.highlighted: bool = False
 
     @property
     def parent(self) -> GameState:
@@ -245,6 +247,10 @@ class GameState:
         self.xray: bool = False
         self._auth_client: OAuth2Session | None = None
         self.first_click: bool = True
+        self.mouse_pos: GridPos = 0, 0
+        self.mouse_global_grid_coord: GridPos = 0, 0
+        self.mouse_sg_coord: GridPos = (self.mouse_global_grid_coord[0] // 8, self.mouse_global_grid_coord[1] // 8)
+        self.shift_pressed: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         """Return a dictionary representation of the game state."""
@@ -259,6 +265,30 @@ class GameState:
             "subgrids": {f"{k[0]},{k[1]}": sg.to_dict() for k, sg in self.subgrids.items()},
             "first_click": self.first_click,
         }
+
+    def mouse_to_global_grid_coords(self, event: MouseEvent) -> GridPos:
+        """
+        Convert mouse event coordinates to global cell coordinates.
+
+        Args:
+            event (MouseEvent): The mouse event
+
+        Returns:
+            GridPos: The global cell coordinates (gx, gy)
+        """
+
+        gx: int = (event.x // 2) + self.offset.x
+        gy: int = event.y + self.offset.y
+        return gx, gy
+
+    def update_mouse_info(self, event: MouseEvent):
+        self.mouse_pos = event.x, event.y
+        self.mouse_global_grid_coord = self.mouse_to_global_grid_coords(event)
+        self.mouse_sg_coord = (self.mouse_global_grid_coord[0] // 8, self.mouse_global_grid_coord[1] // 8)
+        if self.parent:
+            if event.shift or event.shift != self.shift_pressed:
+                self.parent.refresh()
+        self.shift_pressed = event.shift
 
     @property
     def auth_client(self) -> OAuth2Session:
@@ -769,7 +799,8 @@ class GameState:
         # set background based on checker pattern
         sg_coord: GridPos = (gx // 8, gy // 8)
         bg_color = "#000000" if (sg_coord[0] + sg_coord[1]) % 2 == 0 else "#111111"
-
+        if self.mouse_sg_coord == sg_coord and self.shift_pressed:
+            bg_color = "#888800"
 
         if not cell:
             return f"[#C0C0C0 on {bg_color}]? [/]"  # placeholder for not-yet generated subgrid

@@ -1,5 +1,6 @@
 
 ## Objective
+
 The goal of the game is to uncover all the cells that do not contain mines. 
 If you uncover a mine, you lose the game. Your 1st click is always safe.
 If you uncover a cell that is not a mine, it will show a number indicating how many mines are in the neighboring cells. 
@@ -13,6 +14,7 @@ Use this information to determine which cells are safe to uncover.
 * Shift or Ctrl + Left-click on an uncovered cell it will uncover all neighboring cells.
   * As a safety you must have same number of flags as mines in the neighboring cells.
 * Drag to pan the board.
+* Shift + mouse move will highlight current subgrid
 * Keys:
   * `F1` Help.
   * `N` New game.
@@ -33,7 +35,6 @@ Depending the difficulty level, the number of mines in each sub grid will vary.
 
 When all cells that are not mines in a sub grid are uncovered the sub grid is marked solved turns a darker gray and flags are placed on any mines that are not already flagged.  
 Your score is the sum of all mines in the solved sub grids.  
-
 
 ## Internet Leaderboard
 
