@@ -37,16 +37,16 @@ keywords = [
 ]
 dependencies = [
     "asyncio>=3.4.3",
-    "python-dotenv>=1.0.1",
+    "python-dotenv>=1.1.0",
     "requests>=2.32.3",
     "rich>=13.9.4",
-    "orjson>=3.10.15",
-    "typer>=0.15.1",
-    "textual>=2.1.1",
+    "orjson>=3.10.16",
+    "typer>=0.15.2",
+    "textual>=3.0.0",
     "textual-serve>=1.1.1",
-    "pydantic>=2.10.6",
+    "pydantic>=2.11.1",
     "python-jose>=3.4.0",
-    "authlib>=1.5.0",
+    "authlib>=1.5.1",
     "xdg-base-dirs>=6.0.2",
 ]
 packages = [
@@ -79,8 +79,8 @@ dev = [
     "build>=1.2.1",
     "twine>=6.1.0",
     "pyright>=1.1.379",
-    "pre-commit>=4.1.0",
-    "ruff>=0.9.3",
+    "pre-commit>=4.2.0",
+    "ruff>=0.11.2",
     "pyinstrument>=5.0.1",
     "ruff>=0.7.0",
     "types-orjson>=3.6.2",
@@ -110,7 +110,6 @@ include = [
     "src/par_infini_sweeper",
     "LICENSE",
     "README.md",
-    "extraction_prompt.md",
     "pyproject.toml",
 ]
 exclude = [

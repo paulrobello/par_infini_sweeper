@@ -658,7 +658,7 @@ class GameState:
                     if border_cell and not border_cell.is_mine:
                         border_cell.is_mine = True
                         break
-
+                    border_cell = None
         # Generate any adjacent subgrids.
         for dx in [-1, 0, 1]:
             for dy in [-1, 0, 1]:

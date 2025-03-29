@@ -147,8 +147,12 @@ uv run pim [OPTIONS]
 - Optimize for more performance
 
 ## Whats New
+- Version 0.3.5:
+  - Updated dependencies
+  - Minor bug fixes
 - Version 0.3.4:
   - Remove some unnecessary dependencies
+  - Minor bug fixes
 - Version 0.3.3:
   - Subgrids now have subtle checker background
   - Added `S` key to toggle subgrid highlighting
