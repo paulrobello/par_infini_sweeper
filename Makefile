@@ -103,9 +103,8 @@ package:			# Package the library
 spackage:			# Create a source package for the library
 	$(build) -s
 
-.PHONY: packagecheck
-packagecheck: clean package spackage		# Check the packaging.
-	$(twine) check dist/*
+.PHONY: package-check
+package-all: clean package spackage		# Check the packaging.
 
 ##############################################################################
 # Utility.
