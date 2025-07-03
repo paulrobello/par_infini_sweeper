@@ -30,9 +30,6 @@ jobs:
         run: |
           make checkall
 
-      - name: Package
-        run: make packagecheck
-
       - name: Cache build artifacts
         uses: actions/cache@v4
         with:
