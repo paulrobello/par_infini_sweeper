@@ -36,17 +36,16 @@ keywords = [
     "terminal",
 ]
 dependencies = [
-    "asyncio>=3.4.3",
-    "python-dotenv>=1.1.0",
-    "requests>=2.32.3",
-    "rich>=13.9.4",
-    "orjson>=3.10.16",
-    "typer>=0.15.2",
-    "textual>=3.0.0",
-    "textual-serve>=1.1.1",
+    "python-dotenv>=1.1.1",
+    "requests>=2.32.4",
+    "rich>=14.0.0",
+    "orjson>=3.10.18",
+    "typer>=0.16.0",
+    "textual>=3.5.0",
+    "textual-serve>=1.1.2",
     "pydantic>=2.11.1",
-    "python-jose>=3.4.0",
-    "authlib>=1.5.1",
+    "python-jose>=3.5.0",
+    "authlib>=1.6.0",
     "xdg-base-dirs>=6.0.2",
 ]
 packages = [
@@ -76,15 +75,15 @@ build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
-    "build>=1.2.1",
-    "twine>=6.1.0",
-    "pyright>=1.1.379",
+    "pyright>=1.1.402",
     "pre-commit>=4.2.0",
-    "ruff>=0.11.2",
-    "pyinstrument>=5.0.1",
-    "ruff>=0.7.0",
+    "ruff>=0.12.2",
+    "pyinstrument>=5.0.3",
+    "ruff>=0.12.2",
     "types-orjson>=3.6.2",
     "textual-dev>=1.7.0",
+    "hatchling>=1.27.0",
+    "wheel>=0.45.1",
 ]
 
 [tool.hatch.version]

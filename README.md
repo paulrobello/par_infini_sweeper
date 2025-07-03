@@ -147,6 +147,11 @@ uv run pim [OPTIONS]
 - Optimize for more performance
 
 ## Whats New
+
+- Version 0.3.6:
+  - Removed unused dependencies
+  - Updated dependencies
+  - Tested on Python 3.13
 - Version 0.3.5:
   - Updated dependencies
   - Minor bug fixes

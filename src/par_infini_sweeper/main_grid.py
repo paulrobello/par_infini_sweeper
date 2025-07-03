@@ -22,7 +22,7 @@ class MainGrid(Widget, can_focus=True):
         Binding(key="d", action="debug", description="Debug", show=False),
         Binding(key="p", action="pause", description="Pause"),
         Binding(key="s", action="subgrid_highlight", description="Subgrid Highlight"),
-        # Binding(key="ctrl+d", action="xray", description="X-Ray", show=False),
+        Binding(key="ctrl+d", action="xray", description="X-Ray", show=False),
     ]
     ALLOW_SELECT = False
 
