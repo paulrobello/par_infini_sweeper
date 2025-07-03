@@ -5,7 +5,6 @@ run    := uv run
 python := $(run) python
 pyright := $(run) pyright
 ruff  := $(run) ruff
-twine  := $(run) twine
 #build  := $(python) -m build
 build := uvx --from build pyproject-build --installer uv
 
@@ -107,15 +106,6 @@ spackage:			# Create a source package for the library
 .PHONY: packagecheck
 packagecheck: clean package spackage		# Check the packaging.
 	$(twine) check dist/*
-
-.PHONY: testdist
-testdist: packagecheck		# Perform a test distribution
-	$(twine) upload --repository testpypi dist/*
-	#$(twine) upload --skip-existing --repository testpypi dist/*
-
-.PHONY: dist
-dist: packagecheck		# Upload to pypi
-	$(twine) upload --skip-existing dist/*
 
 ##############################################################################
 # Utility.
