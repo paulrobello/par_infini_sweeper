@@ -69,7 +69,7 @@ jobs:
 
       - name: Build if artifacts not cached
         if: steps.cache.outputs.cache-hit != 'true'
-        run: make package
+        run: make package-all
 
       - name: Publish distribution 📦 to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
