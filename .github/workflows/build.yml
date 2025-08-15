@@ -11,27 +11,30 @@ jobs:
   build:
     name: Build distribution 📦
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v4
-
       - name: Install dependencies
         run: |
-          uv sync
+          uv sync --all-extras --dev
 
       - name: Lint and Typecheck
         run: |
           make checkall
 
       - name: Package
-        run: make package-all
+        run: make package
 
       - name: Cache build artifacts
         uses: actions/cache@v4
@@ -47,6 +50,7 @@ jobs:
 
   tag-version:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: write  # Grant write access to the repository
     needs:
@@ -56,17 +60,19 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v4
-
       - name: Install dependencies
         run: |
-          uv sync
+          uv sync --all-extras --dev
 
       - name: Get version from __init__.py
         id: get_version
@@ -82,12 +88,12 @@ jobs:
           if [ -z "${{ env.VERSION }}" ]; then
             echo "Error: VERSION is empty"
             exit 1
-          fi     
+          fi
 
       - name: Configure Git
         run: |
-          git config --global user.name "${{ github.actor }}"
-          git config --global user.email "${{ github.event.pusher.email }}"
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
       - name: App VERSION
         run: echo "VERSION is ${{ env.VERSION }}"
@@ -127,3 +133,9 @@ jobs:
             echo "Failed to push tag"
             exit 1
           fi
+
+      - name: Cleanup on failure
+        if: failure()
+        run: |
+          git tag -d "v${{ env.VERSION }}" || true
+          git push --delete origin "v${{ env.VERSION }}" || true

@@ -23,12 +23,12 @@ A clear and concise description of what you expected to happen.
 **Screenshots**
 If applicable, add screenshots to help explain your problem.
 
-**Desktop (please complete the following information):**
- - OS: [e.g. iOS]
- - Browser [e.g. chrome, safari]
- - Version [e.g. 22]
- - Terminal [e.g. VSCode, Iterm2, Windows Terminal]
- - Terminal version [e.g. 1.0.0]
+**Environment (please complete the following information):**
+ - OS: [e.g. macOS, Linux, Windows]
+ - Python version: [e.g. 3.12]
+ - Terminal: [e.g. iTerm2, Terminal, Windows Terminal]
+ - Shell: [e.g. zsh, bash]
+ - Package version: [e.g. 0.1.0]
 
 **Additional context**
 Add any other context about the problem here.

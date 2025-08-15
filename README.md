@@ -36,9 +36,9 @@ Infinite Minesweeper TUI. Play a game of minesweeper with infinite board size!
 
 ## Objective
 
-The goal of the game is to uncover all the cells that do not contain mines. 
+The goal of the game is to uncover all the cells that do not contain mines.
 If you uncover a mine, you lose the game. Your 1st click is always safe.
-If you uncover a cell that is not a mine, it will show a number indicating how many mines are in the neighboring cells. 
+If you uncover a cell that is not a mine, it will show a number indicating how many mines are in the neighboring cells.
 Use this information to determine which cells are safe to uncover.
 
 ## Controls
@@ -94,7 +94,8 @@ See our [privacy policy](https://par-com.net/privacy_policy.html) for details on
 
 ## Prerequisites
 
-The instructions assume you have `uv` installed.
+- Python 3.11 - 3.13 (3.12 recommended)
+- The instructions assume you have `uv` installed.
 
 ## Installation
 
@@ -148,6 +149,12 @@ uv run pim [OPTIONS]
 
 ## Whats New
 
+- Version 0.3.7:
+  - Fixed GitHub Actions workflows for correct project references
+  - Added Python version matrix testing (3.11, 3.12, 3.13)
+  - Updated build configuration to target Python 3.12
+  - Improved Makefile with test and clean-all targets
+  - Fixed duplicate dependencies in pyproject.toml
 - Version 0.3.6:
   - Removed unused dependencies
   - Updated dependencies
@@ -182,11 +189,11 @@ uv run pim [OPTIONS]
   - Updated readme and help
 - Version 0.2.7:
   - Added pause key `p`
-  - Fixed bug where sometimes newly generated sub grids would not get saved if no cells were uncovered 
+  - Fixed bug where sometimes newly generated sub grids would not get saved if no cells were uncovered
   - More optimizations
   - Support for future game modes
 - Version 0.2.6:
-  - Now only highlights unrevealed surrounding cells when shift/ctrl + left-click on uncovered cells 
+  - Now only highlights unrevealed surrounding cells when shift/ctrl + left-click on uncovered cells
 - Version 0.2.6:
   - Now stops timer on game over
   - Now highlights surrounding cells when shift/ctrl + left-click on uncovered cells

@@ -82,6 +82,10 @@ typecheck:			# Perform static type checks with pyright
 typecheck-stats:			# Perform static type checks with pyright and print stats
 	$(pyright) --stats
 
+.PHONY: test
+test:			# Run tests
+	@echo "No tests configured yet"
+
 .PHONY: checkall
 checkall: format lint typecheck 	        # Check all the things
 
@@ -117,6 +121,10 @@ repl:				# Start a Python REPL
 .PHONY: clean
 clean:				# Clean the build directories
 	rm -rf build dist $(lib).egg-info
+
+.PHONY: clean-all
+clean-all: clean			# Clean everything including cache
+	rm -rf .ruff_cache .pytest_cache __pycache__ src/**/__pycache__ .mypy_cache
 
 .PHONY: help
 help:				# Display this help

@@ -2,11 +2,19 @@ name: Release 🐍 distribution
 
 on:
   workflow_dispatch:
+  workflow_run:
+    workflows: ["Publish 🐍 📦 to PyPI"]
+    types:
+      - completed
+    branches:
+      - main
 
 jobs:
   github-release:
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
     name: Create GitHub Release
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: write
       id-token: write
@@ -25,7 +33,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          uv sync
+          uv sync --all-extras --dev
 
       - name: Get version from __init__.py
         id: get_version
@@ -83,3 +91,11 @@ jobs:
         uses: Ilshidur/action-discord@master
         with:
           args: 'A new release ${{ github.ref_name }} has been created for {{ EVENT_PAYLOAD.repository.full_name }}.'
+
+      - name: Cleanup on failure
+        if: failure()
+        run: |
+          gh release delete 'release-v${{ env.VERSION }}' --yes || true
+          rm -rf dist/ || true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}

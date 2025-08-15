@@ -1,3 +1,5 @@
+"""Data structures for Par Infinite Minesweeper game."""
+
 from __future__ import annotations
 
 import os
@@ -24,7 +26,7 @@ GridPos = tuple[int, int]
 mine_counts: dict[GameDifficulty, int] = {GameDifficulty.EASY: 8, GameDifficulty.MEDIUM: 12, GameDifficulty.HARD: 16}
 difficulty_mult: dict[GameDifficulty, int] = {GameDifficulty.EASY: 1, GameDifficulty.MEDIUM: 2, GameDifficulty.HARD: 3}
 
-"""Return a color based on the count of adjacent mines."""
+# Color mapping based on the count of adjacent mines
 count_to_color: dict[int, str] = {
     0: "#FFFFFF",
     1: "#00FF00",

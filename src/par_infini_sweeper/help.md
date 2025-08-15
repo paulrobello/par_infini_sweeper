@@ -1,9 +1,9 @@
 
 ## Objective
 
-The goal of the game is to uncover all the cells that do not contain mines. 
+The goal of the game is to uncover all the cells that do not contain mines.
 If you uncover a mine, you lose the game. Your 1st click is always safe.
-If you uncover a cell that is not a mine, it will show a number indicating how many mines are in the neighboring cells. 
+If you uncover a cell that is not a mine, it will show a number indicating how many mines are in the neighboring cells.
 Use this information to determine which cells are safe to uncover.
 
 ## Controls

@@ -2,17 +2,24 @@ name: Publish 🐍 📦 to PyPI
 
 on:
   workflow_dispatch:
+  workflow_run:
+    workflows: ["Publish 🐍 📦 to TestPyPI"]
+    types:
+      - completed
+    branches:
+      - main
   release:
     types: [ published ]
 
 jobs:
   publish-to-pypi:
-    if: github.event_name == 'workflow_dispatch'  # Only allow manual triggers
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'release' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
     name: Publish 🐍 distribution 📦 to PyPI
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     environment:
       name: pypi
-      url: https://pypi.org/p/par_infini_sweeper
+      url: https://pypi.org/p/par-infini-sweeper
     permissions:
       id-token: write  # IMPORTANT: mandatory for trusted publishing
 
@@ -20,17 +27,19 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v4
-
       - name: Install dependencies
         run: |
-          uv sync
+          uv sync --all-extras --dev
 
       - name: Get version from __init__.py
         id: get_version
@@ -49,15 +58,18 @@ jobs:
           fi
 
       - name: Restore cached build artifacts
+        id: cache
         uses: actions/cache@v4
         with:
           path: dist
           key: ${{ runner.os }}-3.12-x64-${{ hashFiles('**/pyproject.toml') }}-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-3.12-x64-${{ hashFiles('**/pyproject.toml') }}-
-            ${{ runner.os }}-3.12-x64-${{ env.VERSION }}-
             ${{ runner.os }}-3.12-x64-
-          fail-on-cache-miss: true
+
+      - name: Build if artifacts not cached
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: make package
 
       - name: Publish distribution 📦 to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
@@ -69,3 +81,8 @@ jobs:
         with:
           args: 'The project {{ EVENT_PAYLOAD.repository.full_name }} ${{ env.VERSION }} has been published to PyPI.'
         continue-on-error: true
+
+      - name: Cleanup on failure
+        if: failure()
+        run: |
+          rm -rf dist/ || true
