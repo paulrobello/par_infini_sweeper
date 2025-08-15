@@ -69,6 +69,11 @@ jobs:
         if: steps.cache.outputs.cache-hit != 'true'
         run: make package-all
 
+      - name: List dist contents
+        run: |
+          echo "Contents of dist directory:"
+          ls -la dist/ || echo "dist directory does not exist"
+
       - name: Publish distribution 📦 to TestPyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:

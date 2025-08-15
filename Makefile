@@ -107,8 +107,8 @@ package:			# Package the library
 spackage:			# Create a source package for the library
 	$(build) -s
 
-.PHONY: package-check
-package-all: clean package spackage		# Check the packaging.
+.PHONY: package-all
+package-all: clean package spackage		# Package both wheel and source
 
 ##############################################################################
 # Utility.

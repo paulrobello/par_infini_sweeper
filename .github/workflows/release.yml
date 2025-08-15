@@ -65,6 +65,11 @@ jobs:
         if: steps.cache.outputs.cache-hit != 'true'
         run: make package-all
 
+      - name: List dist contents
+        run: |
+          echo "Contents of dist directory:"
+          ls -la dist/ || echo "dist directory does not exist"
+
       - name: Sign the dists with Sigstore
         uses: sigstore/gh-action-sigstore-python@v3.0.0
         with:
