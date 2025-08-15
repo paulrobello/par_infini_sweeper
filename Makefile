@@ -5,8 +5,8 @@ run    := uv run
 python := $(run) python
 pyright := $(run) pyright
 ruff  := $(run) ruff
-#build  := $(python) -m build
-build := uvx --from build pyproject-build --installer uv
+build  := $(python) -m build
+#build := uvx --from build pyproject-build --installer uv
 
 #export UV_LINK_MODE=copy
 export PIPENV_VERBOSITY=-1

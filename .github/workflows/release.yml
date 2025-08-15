@@ -33,7 +33,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          uv sync --all-extras --dev
+          uv sync --all-groups
 
       - name: Get version from __init__.py
         id: get_version
@@ -63,7 +63,14 @@ jobs:
 
       - name: Build if artifacts not cached
         if: steps.cache.outputs.cache-hit != 'true'
-        run: make package-all
+        run: |
+          echo "Building packages..."
+          echo "Running: make package-all"
+          make package-all
+          echo "Build complete. Checking results..."
+          ls -la dist/
+          echo "Checking for .tar.gz files:"
+          find . -name "*.tar.gz" -type f 2>/dev/null || echo "No .tar.gz files found"
 
       - name: List dist contents
         run: |
