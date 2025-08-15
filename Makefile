@@ -100,7 +100,7 @@ pre-commit-update:
 ##############################################################################
 # Package/publish.
 .PHONY: package
-package:			# Package the library
+package:			# Package the library (wheel only)
 	$(build) -w
 
 .PHONY: spackage
@@ -108,7 +108,8 @@ spackage:			# Create a source package for the library
 	$(build) -s
 
 .PHONY: package-all
-package-all: clean package spackage		# Package both wheel and source
+package-all: clean		# Package both wheel and source
+	$(build)
 
 ##############################################################################
 # Utility.
