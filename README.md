@@ -94,7 +94,7 @@ See our [privacy policy](https://par-com.net/privacy_policy.html) for details on
 
 ## Prerequisites
 
-- Python 3.11 - 3.13 (3.12 recommended)
+- Python 3.11 - 3.13 (3.13 recommended)
 - The instructions assume you have `uv` installed.
 
 ## Installation
@@ -149,6 +149,10 @@ uv run pim [OPTIONS]
 
 ## Whats New
 
+- Version 0.3.8:
+  - Updated dependencies
+  - Ensured Python 3.13 compatibility
+  - Updated build and CI/CD configuration to use Python 3.13 as default
 - Version 0.3.7:
   - Fixed GitHub Actions workflows for correct project references
   - Added Python version matrix testing (3.11, 3.12, 3.13)
