@@ -10,6 +10,7 @@ Only in the initial subgrid may any cell be clicked; in other subgrids only cell
 
 from __future__ import annotations
 
+import logging
 import os
 import socketserver
 from typing import Any
@@ -35,6 +36,8 @@ from par_infini_sweeper.dialogs.url_dialog import UrlDialog
 from par_infini_sweeper.enums import GameDifficulty
 from par_infini_sweeper.main_grid import MainGrid
 from par_infini_sweeper.messages import AuthServerError, ShowURL, WebServerStarted, WebServerStopped
+
+logger = logging.getLogger(__name__)
 
 
 class PimApp(App):
@@ -174,8 +177,12 @@ class PimApp(App):
         if self._web_server:
             try:
                 self._web_server.shutdown()
-            except Exception as _:
-                pass
+            except OSError:
+                # QA-004: webserver shutdown is best-effort cleanup (socket may
+                # already be torn down by the OS during process exit). Keep
+                # swallowing but surface it at debug so port-reuse diagnostics
+                # aren't completely invisible.
+                logger.debug("webserver shutdown raised, ignoring", exc_info=True)
             finally:
                 self._web_server = None
 

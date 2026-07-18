@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from textwrap import dedent
 from typing import Literal
 
+import requests
+from authlib.oauth2 import OAuth2Error
 from textual import on, work
 from textual.app import ComposeResult
 from textual.binding import Binding
@@ -18,6 +21,8 @@ from par_infini_sweeper.data_structures import GameState
 from par_infini_sweeper.dialogs.input_dialog import InputDialog
 from par_infini_sweeper.models import validate_nickname
 from par_infini_sweeper.utils import escape_brackets
+
+logger = logging.getLogger(__name__)
 
 
 class AuthDialog(ModalScreen[None]):
@@ -69,7 +74,7 @@ class AuthDialog(ModalScreen[None]):
         status: Literal["success", "error"]
         msg: str
 
-    def __init__(self, game_state: GameState) -> None:  # noqa: F821
+    def __init__(self, game_state: GameState) -> None:
         """Initialise the dialog."""
         super().__init__()
 
@@ -81,7 +86,12 @@ class AuthDialog(ModalScreen[None]):
         try:
             if self.game_state.auth_client:
                 self.post_message(AuthDialog.OauthDone("success", "Logged in"))
-        except Exception as e:
+        except (OAuth2Error, requests.RequestException, RuntimeError) as e:
+            # QA-004: auth failures come back as OAuth2Error (Auth0 returned an
+            # error response), RequestException (transport), or RuntimeError
+            # (no parent widget / app context). Narrowed from bare Exception so
+            # programming errors surface instead of being silently swallowed.
+            logger.warning("login flow failed: %r", e, exc_info=True)
             self.notify(str(e), severity="error")
             self.post_message(AuthDialog.OauthDone("error", str(e)))
 
@@ -166,9 +176,18 @@ class AuthDialog(ModalScreen[None]):
         try:
             result = self.game_state.post_internet_score()
             if result.status != "success":
-                raise Exception(result.message)
+                # QA-004: server-reported error in the response body — log +
+                # surface to the user without going through the catch below
+                # (it isn't an exception path).
+                logger.warning("score upload rejected by server: %s", result.message)
+                self.notify(escape_brackets(result.message or "Upload failed"), severity="error")
+                return
             self.notify("Score uploaded", severity="information")
-        except Exception as e:
+        except (requests.RequestException, ValueError) as e:
+            # QA-004: network failure (RequestException) or malformed response
+            # (ValueError from .json() / pydantic ValidationError). Narrowed
+            # from bare Exception so programming errors still surface.
+            logger.exception("score upload failed")
             self.notify(escape_brackets(str(e)), severity="error")
 
     @on(Button.Pressed, "#change_nickname")
@@ -194,10 +213,16 @@ class AuthDialog(ModalScreen[None]):
         try:
             result = self.game_state.change_internet_nickname(new_nickname)
             if result.status != "success":
-                raise Exception(result.message)
-            else:
-                self.notify(escape_brackets(result.message or "Nickname changed"), severity="information")
-        except Exception as e:
+                # QA-004: server-reported error — log + surface to the user
+                # without going through the catch below.
+                logger.warning("nickname change rejected by server: %s", result.message)
+                self.notify(escape_brackets(result.message or "Nickname change failed"), severity="error")
+                return
+            self.notify(escape_brackets(result.message or "Nickname changed"), severity="information")
+        except (requests.RequestException, ValueError) as e:
+            # QA-004: network failure or malformed response — narrowed from
+            # bare Exception so programming errors still surface.
+            logger.exception("nickname change failed")
             self.notify(escape_brackets(str(e)), severity="error")
             return
         await self.recompose()

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import http.server
+import logging
 import os
 import secrets
 import socketserver
@@ -10,11 +11,15 @@ import webbrowser
 from typing import Any
 from urllib.parse import urlparse
 
+import requests
 from authlib.integrations.requests_client import OAuth2Session
+from authlib.oauth2 import OAuth2Error
 from textual.app import App
 
 from par_infini_sweeper import db
 from par_infini_sweeper.messages import AuthServerError, ShowURL, WebServerStarted, WebServerStopped
+
+logger = logging.getLogger(__name__)
 
 # Production Auth0 tenant + client ID. Local dev should override BOTH via env
 # (e.g. point at a test tenant). See warn_if_default_auth0_client_id() for the
@@ -105,9 +110,12 @@ def build_auth_client(user: dict[str, Any], app: App) -> OAuth2Session:
                 user["expires_at"] = client.token["expires_at"]
                 db.save_user(user)
                 return client
-            except Exception as _:
-                # refresh failed, blank out auth info and start fresh
-                # print(f"Error refreshing token: {e}")
+            except (OAuth2Error, requests.RequestException):
+                # QA-004: refresh failed (OAuth error from Auth0 or transport
+                # failure). Blank out auth info and start fresh. Logged at
+                # info — this fires on every cold-start with a stale refresh
+                # token, so warning would spam the log.
+                logger.info("token refresh failed; clearing auth state", exc_info=True)
                 user["access_token"] = ""
                 user["refresh_token"] = ""
                 user["expires_at"] = 0
@@ -166,12 +174,14 @@ def start_auth_server(client: OAuth2Session, user: dict[str, Any], app: App) -> 
                 user["expires_at"] = token.get("expires_at")
 
                 db.save_user(user)
-            except Exception as e:
-                # Log the raw exception for diagnostics, but do NOT echo it to
-                # the HTTP response body — anyone reaching the loopback callback
-                # (e.g. via a browser redirect) would otherwise be able to
-                # fingerprint the auth setup via the error text.
-                print(f"oauth callback error: {e!r}", file=sys.stderr)
+            except (OAuth2Error, requests.RequestException) as e:
+                # QA-004: log the raw exception for diagnostics via the module
+                # logger, but do NOT echo it to the HTTP response body — anyone
+                # reaching the loopback callback (e.g. via a browser redirect)
+                # would otherwise be able to fingerprint the auth setup via the
+                # error text. Narrowed from bare ``except Exception`` so a
+                # programming error in the handler still crashes loudly.
+                logger.warning("oauth callback token exchange failed: %r", e, exc_info=True)
                 self.send_error(500, "Authentication failed")
                 return
 

@@ -15,11 +15,14 @@ ARC-005 deferred: the ``parent`` widget bridge (``self.parent.notify`` /
 
 from __future__ import annotations
 
+import logging
 import time
+from collections import deque
+from collections.abc import Iterator
 from typing import Any
 
 from authlib.integrations.requests_client import OAuth2Session
-from jose import jwt
+from jose import JWTError, jwt
 from textual.geometry import Offset
 from textual.widget import Widget
 
@@ -35,6 +38,26 @@ from par_infini_sweeper.models import ChangeNicknameResponse, PostScoreResult
 from par_infini_sweeper.renderer import render_cell
 from par_infini_sweeper.utils import format_duration
 
+logger = logging.getLogger(__name__)
+
+# QA-003: safety bound on the reveal flood-fill BFS. Natural queue draining
+# handles normal openings; this caps pathological inputs (e.g. a corrupted
+# board where every cell thinks it has zero mine neighbours) so the loop
+# cannot run away. It is NOT a recursion limit and never silently truncates a
+# legitimate reveal — the visited set is the real termination guarantee.
+MAX_REVEAL_ITERATIONS = 250
+
+_CELL_OFFSETS: tuple[tuple[int, int], ...] = (
+    (-1, -1),
+    (-1, 0),
+    (-1, 1),
+    (0, -1),
+    (0, 1),
+    (1, -1),
+    (1, 0),
+    (1, 1),
+)
+
 
 class GameState:
     """Represents the overall game state including difficulty and all subgrids."""
@@ -49,7 +72,9 @@ class GameState:
         self.subgrids[(0, 0)] = SubGrid(self, (0, 0), self.difficulty)
         game: dict[str, Any] = user["game"]
         offset: list[str] = game["board_offset"].split(",")
-        assert len(offset) == 2
+        # QA-007: runtime validation must survive ``python -O`` (assert is stripped).
+        if len(offset) != 2:
+            raise ValueError(f"board_offset must be 'x,y', got {game['board_offset']!r} ({len(offset)} parts)")
         self.offset = Offset(int(offset[0]), int(offset[1]))
         self.num_solved: int = 0
         self.started_ts: int = int(time.time())
@@ -125,7 +150,10 @@ class GameState:
     @property
     def auth_client(self) -> OAuth2Session:
         if not self._auth_client or not self.is_logged_in():
-            assert self.parent and self.parent.app
+            # QA-007: parent + app are required to build the OAuth session; raise
+            # rather than assert so the check survives ``python -O``.
+            if self.parent is None or self.parent.app is None:
+                raise RuntimeError("auth_client requires a parent widget with a running app")
             self._auth_client = build_auth_client(self.user, self.parent.app)
         return self._auth_client
 
@@ -147,7 +175,10 @@ class GameState:
             # lets us transparently renew, so treat that as logged-in.
             is_expired = time_remaining <= grace_time
             return (not is_expired) or bool(self.user.get("refresh_token"))
-        except Exception as _:
+        except JWTError:
+            # QA-004: malformed / tampered / unparsable JWT means the session
+            # is invalid — log and tear it down rather than silently swallowing.
+            logger.exception("access token failed JWT parsing; logging out")
             self.logout()
             return False
 
@@ -212,12 +243,26 @@ class GameState:
         self.save()
 
     def compute_board_center(self) -> Offset:
-        """Compute the center of the game board in cells based on subgrid positions."""
-        c = (0, 0)
-        for k in self.subgrids.keys():
-            c = (c[0] + k[0] * 8, c[1] + k[1] * 8)
+        """Compute the cell-coordinate at which ``action_center`` should anchor.
 
-        return Offset(c[0] // len(self.subgrids) + 5, c[1] // len(self.subgrids) - 3)
+        QA-010: returns ``Offset(0, 0)`` when there are no subgrids rather than
+        dividing by zero (this state is reachable mid-reset between
+        ``new_game`` clearing ``self.subgrids`` and the first subgrid being
+        inserted).
+
+        The ``+5`` / ``-3`` are the same viewport anchor ``MainGrid.action_origin``
+        uses to centre on the (0,0) subgrid alone: they bias the multi-subgrid
+        centroid so the origin subgrid's centre sits in a comfortable quadrant
+        of the viewport instead of flush at the corner. With only the origin
+        subgrid present the centroid is (0, 0) and the result reduces to
+        ``Offset(5, -3)`` — identical to ``action_origin``'s anchor.
+        """
+        if not self.subgrids:
+            return Offset(0, 0)
+        total_x = sum(k[0] * 8 for k in self.subgrids)
+        total_y = sum(k[1] * 8 for k in self.subgrids)
+        n = len(self.subgrids)
+        return Offset(total_x // n + 5, total_y // n - 3)
 
     @property
     def num_changed(self) -> int:
@@ -299,6 +344,19 @@ class GameState:
             sg.clear_changed()
         self.changed_subgrids.clear()
 
+    @staticmethod
+    def _iter_neighbor_coords(gx: int, gy: int) -> Iterator[tuple[int, int]]:
+        """Yield the 8 global neighbour coordinates of ``(gx, gy)``.
+
+        QA-008: the nested ``for dx in [-1, 0, 1]: for dy in [-1, 0, 1]``
+        pattern with the ``dx == 0 and dy == 0`` skip was copy-pasted through
+        every neighbour walk. Routing through one generator keeps the
+        off-by-one skip in a single place and gives call sites a flat
+        ``for nx, ny in ...`` loop.
+        """
+        for dx, dy in _CELL_OFFSETS:
+            yield gx + dx, gy + dy
+
     def global_to_cell(self, gx: int, gy: int, create_if_needed: bool = False) -> Cell | None:
         """
         Convert global coordinates to local cell coordinates.
@@ -333,19 +391,14 @@ class GameState:
         Returns:
             bool: True if the cell has at least one uncovered neighbor, False otherwise
         """
-        for dx in [-1, 0, 1]:
-            for dy in [-1, 0, 1]:
-                if dx == 0 and dy == 0:
-                    continue
-                nx: int = gx + dx
-                ny: int = gy + dy
-                n_sg: GridPos = (nx // 8, ny // 8)
-                if n_sg in self.subgrids:
-                    subgrid: SubGrid = self.subgrids[n_sg]
-                    lx: int = nx % 8
-                    ly: int = ny % 8
-                    if subgrid.cells[ly][lx].uncovered or subgrid.cells[ly][lx].is_mine:
-                        return True
+        for nx, ny in self._iter_neighbor_coords(gx, gy):
+            n_sg: GridPos = (nx // 8, ny // 8)
+            if n_sg in self.subgrids:
+                subgrid: SubGrid = self.subgrids[n_sg]
+                lx: int = nx % 8
+                ly: int = ny % 8
+                if subgrid.cells[ly][lx].uncovered or subgrid.cells[ly][lx].is_mine:
+                    return True
         return False
 
     def count_adjacent_flags_mines(self, gx: int, gy: int) -> tuple[int, int]:
@@ -362,37 +415,45 @@ class GameState:
         """
         mine_count: int = 0
         flag_count: int = 0
-        for dx in [-1, 0, 1]:
-            for dy in [-1, 0, 1]:
-                if dx == 0 and dy == 0:
-                    continue
-                nx: int = gx + dx
-                ny: int = gy + dy
-                n_sg: GridPos = (nx // 8, ny // 8)
-                if n_sg not in self.subgrids:
-                    continue
-                subgrid: SubGrid = self.subgrids[n_sg]
-                lx: int = nx % 8
-                ly: int = ny % 8
-                if subgrid.cells[ly][lx].is_mine:
-                    mine_count += 1
-                if subgrid.cells[ly][lx].marked:
-                    flag_count += 1
+        for nx, ny in self._iter_neighbor_coords(gx, gy):
+            n_sg: GridPos = (nx // 8, ny // 8)
+            if n_sg not in self.subgrids:
+                continue
+            subgrid: SubGrid = self.subgrids[n_sg]
+            lx: int = nx % 8
+            ly: int = ny % 8
+            if subgrid.cells[ly][lx].is_mine:
+                mine_count += 1
+            if subgrid.cells[ly][lx].marked:
+                flag_count += 1
         return flag_count, mine_count
 
     def reveal_cell(self, gx: int, gy: int, depth: int = 0) -> None:
-        """
-        Reveal the cell at global coordinates (gx, gy). If it is a mine the game ends. Also, generate any adjacent subgrids as needed.
+        """Reveal the cell at global coordinates ``(gx, gy)``.
+
+        If the cell is a mine the game ends, unless it is the user's first
+        click — in which case the mine is relocated to a neighbouring non-mine
+        cell so the opening never loses on the first click. Cells with zero
+        adjacent mines trigger a flood-fill that reveals every connected empty
+        cell via an iterative BFS (QA-003: replaces the depth-bounded
+        recursion — no recursion-limit risk, no magic depth cap silently
+        truncating large openings).
 
         Args:
-            gx (int): The global x-coordinate of the cell
-            gy (int): The global y-coordinate of the cell
-            depth (int): The depth of the recursion (to prevent infinite recursion)
+            gx (int): The global x-coordinate of the cell.
+            gy (int): The global y-coordinate of the cell.
+            depth (int): Reserved. Pre-BFS this was the recursion depth; the
+                BFS rewrite ignores it but the parameter is retained so
+                external callers (and tests) that pass ``depth=N`` to simulate
+                an in-flood-fill state keep working.
         """
         if self.game_over:
             return
         sg_coord: GridPos = (gx // 8, gy // 8)
-        assert self.parent
+        # QA-007: parent is required for UI notifications; raise rather than
+        # assert so the check survives ``python -O``.
+        if self.parent is None:
+            raise RuntimeError("reveal_cell requires a parent widget for UI notifications")
         # For non-initial subgrids, only allow a reveal if at least one neighbor is uncovered.
         if sg_coord != (0, 0) and not self.cell_has_uncovered_neighbor(gx, gy):
             self.parent.notify("No uncovered neighbors")
@@ -404,68 +465,151 @@ class GameState:
             return
 
         cell.uncovered = True
-        if cell.uncovered and cell.is_mine:
+        if cell.is_mine:
             if not self.first_click:
-                self.game_over = True
-                self.save()
-                self.save_score()
-                self.parent.refresh()
+                self._end_game()
                 return
-            cell.is_mine = False
             # ARC-015: relocate the mine to the first surrounding non-mine cell.
-            # The previous code declared ``border_cell: Cell | None`` at both
-            # the outer scope and again inside the inner loop, which pyright
-            # flags as a redeclaration (and reads as shadowing). Renamed so the
-            # accumulator (``target``) and each inspected neighbor (``candidate``)
-            # are distinct variables; logic is identical.
-            target: Cell | None = None
-            for dx in [-1, 0, 1]:
-                if target:
-                    break
-                for dy in [-1, 0, 1]:
-                    if dx == 0 and dy == 0:
-                        continue
-                    nx: int = gx + dx
-                    ny: int = gy + dy
-                    candidate: Cell | None = self.global_to_cell(nx, ny, True)
-                    if candidate and not candidate.is_mine:
-                        candidate.is_mine = True
-                        target = candidate
-                        break
+            # Pre-QA-003 this inline loop declared ``border_cell`` at both the
+            # outer scope and again inside the inner loop (shadowing); extracted
+            # helper uses ``target`` (accumulator) / ``candidate`` (each
+            # inspected neighbour) so the names stay distinct.
+            self._relocate_first_click_mine(gx, gy, cell)
+
         # Generate any adjacent subgrids.
-        for dx in [-1, 0, 1]:
-            for dy in [-1, 0, 1]:
-                if dx == 0 and dy == 0:
-                    continue
-                nx: int = gx + dx
-                ny: int = gy + dy
-                n_sg: GridPos = (nx // 8, ny // 8)
-                if n_sg not in self.subgrids:
-                    self.subgrids[n_sg] = SubGrid(self, n_sg, self.difficulty)
-                    self.subgrids[n_sg].changed = True
+        self._ensure_neighbor_subgrids(gx, gy)
 
         # QA-002: on the entry call (depth==0) the originally-clicked cell has
         # already been through the first-click mine-relocation branch above, so
-        # clear the flag NOW — before any recursion — so mines encountered during
-        # the flood fill end the game instead of being silently relocated. The
-        # caller used to clear this only after reveal_cell returned, leaving it
-        # True for the entire opening region.
+        # clear the flag NOW — before the flood fill — so mines encountered
+        # during expansion end the game instead of being silently relocated.
+        # The caller used to clear this only after reveal_cell returned,
+        # leaving it True for the entire opening region.
         if depth == 0:
             self.first_click = False
 
-        # Prevent infinite recursion by limiting depth.
-        if depth < 250:
-            # If the cell has 0 neighboring mines, recursively reveal its neighbors.
-            counts: tuple[int, int] = self.count_adjacent_flags_mines(gx, gy)
-            if counts[1] == 0:
-                for dx in [-1, 0, 1]:
-                    for dy in [-1, 0, 1]:
-                        if dx == 0 and dy == 0:
-                            continue
-                        nx: int = gx + dx
-                        ny: int = gy + dy
-                        self.reveal_cell(nx, ny, depth + 1)
+        # QA-003: BFS flood-fill — no recursion, no depth cap on legitimate
+        # openings. Returns the set of subgrids it revealed into so the
+        # orchestrator can run ``check_subgrid_solved`` on each (mirroring the
+        # pre-BFS behaviour where every recursive call ended with a solve
+        # check on its own subgrid).
+        touched_subgrids = self._flood_fill_reveal(gx, gy)
         self.check_subgrid_solved(sg_coord)
+        for touched_sg in touched_subgrids:
+            self.check_subgrid_solved(touched_sg)
+
+    def _end_game(self) -> None:
+        """Mark the game as over, persist the final state, and refresh the UI."""
+        self.game_over = True
+        self.save()
+        self.save_score()
+        if self.parent is not None:
+            self.parent.refresh()
+
+    def _relocate_first_click_mine(self, gx: int, gy: int, clicked: Cell) -> None:
+        """Move the mine off the first-clicked cell to a neighbouring non-mine cell.
+
+        ARC-015: the original code declared ``border_cell: Cell | None`` twice
+        (outer scope + inner loop), which reads as shadowing. Renamed so the
+        accumulator (``target``) and each inspected neighbour (``candidate``)
+        are distinct variables; logic is byte-for-byte identical.
+
+        Args:
+            gx (int): The global x-coordinate of the clicked cell.
+            gy (int): The global y-coordinate of the clicked cell.
+            clicked (Cell): The clicked cell whose mine flag is being relocated.
+        """
+        clicked.is_mine = False
+        target: Cell | None = None
+        for nx, ny in self._iter_neighbor_coords(gx, gy):
+            if target is not None:
+                break
+            candidate: Cell | None = self.global_to_cell(nx, ny, True)
+            if candidate is not None and not candidate.is_mine:
+                candidate.is_mine = True
+                target = candidate
+
+    def _ensure_neighbor_subgrids(self, gx: int, gy: int) -> None:
+        """Create the 8 neighbour subgrids of ``(gx, gy)`` if they don't yet exist.
+
+        Preserves the pre-BFS side effect where ``reveal_cell`` materialised
+        adjacent subgrids regardless of whether the flood fill expanded into
+        them, so subsequent ``count_adjacent_flags_mines`` /
+        ``cell_has_uncovered_neighbor`` queries don't silently no-op on
+        missing subgrids.
+        """
+        for nx, ny in self._iter_neighbor_coords(gx, gy):
+            n_sg: GridPos = (nx // 8, ny // 8)
+            if n_sg not in self.subgrids:
+                self.subgrids[n_sg] = SubGrid(self, n_sg, self.difficulty)
+                self.subgrids[n_sg].changed = True
+
+    def _flood_fill_reveal(self, start_gx: int, start_gy: int) -> set[GridPos]:
+        """BFS-reveal every empty cell reachable from ``(start_gx, start_gy)``.
+
+        QA-003: replaces the depth-bounded recursion (magic ``250`` cap that
+        silently truncated large openings, plus recursion-limit risk). Uses an
+        explicit visited set + BFS queue; ``MAX_REVEAL_ITERATIONS`` is a safety
+        bound against pathological inputs (corrupted board where every cell
+        reports zero mine neighbours), not a recursion limit, and never
+        truncates a legitimate reveal — the visited set alone guarantees
+        termination on a well-formed board.
+
+        First-click safety is preserved by the caller: ``first_click`` is
+        cleared at the entry call (``depth == 0``) before this method runs,
+        so any mine encountered here is a real mine hit and ends the game
+        rather than being silently relocated.
+
+        Args:
+            start_gx (int): The global x-coordinate to flood from (the cell the
+                user clicked, already revealed by the caller).
+            start_gy (int): The global y-coordinate to flood from.
+
+        Returns:
+            set[GridPos]: The subgrid coordinates that had at least one cell
+            revealed by this flood, so the caller can run ``check_subgrid_solved``
+            on each (mirroring the pre-BFS per-call solve check).
+        """
+        visited: set[tuple[int, int]] = {(start_gx, start_gy)}
+        queue: deque[tuple[int, int]] = deque([(start_gx, start_gy)])
+        touched_subgrids: set[GridPos] = set()
+        iterations = 0
+        while queue:
+            iterations += 1
+            if iterations > MAX_REVEAL_ITERATIONS:
+                logger.warning(
+                    "reveal flood-fill hit %d-iteration safety bound; this indicates a corrupted board",
+                    MAX_REVEAL_ITERATIONS,
+                )
+                break
+            cx, cy = queue.popleft()
+            # Stop expanding once the game has ended (mine hit) — recursive
+            # calls would no-op on the game_over guard anyway.
+            if self.game_over:
+                break
+            _, mine_count = self.count_adjacent_flags_mines(cx, cy)
+            # Only expand through cells whose neighbours are all mine-free.
+            if mine_count != 0:
+                continue
+            for nx, ny in self._iter_neighbor_coords(cx, cy):
+                if (nx, ny) in visited:
+                    continue
+                n_cell: Cell | None = self.global_to_cell(nx, ny, True)
+                if n_cell is None or n_cell.marked or n_cell.uncovered:
+                    continue
+                n_cell.uncovered = True
+                visited.add((nx, ny))
+                touched_subgrids.add((nx // 8, ny // 8))
+                # QA-002: first_click was cleared before the flood started, so
+                # a mine here is a real mine hit — end the game rather than
+                # relocate.
+                if n_cell.is_mine:
+                    self._end_game()
+                    return touched_subgrids
+                # Preserve the per-cell "generate neighbour subgrids" side effect.
+                self._ensure_neighbor_subgrids(nx, ny)
+                queue.append((nx, ny))
+        return touched_subgrids
 
     def reveal_surround(self, gx: int, gy: int) -> None:
         """
@@ -490,16 +634,12 @@ class GameState:
                 # self.notify("Flag count does not match mine count", severity="error")
                 return
 
-            for dx in [-1, 0, 1]:
-                for dy in [-1, 0, 1]:
-                    if dx == 0 and dy == 0:
-                        continue
-                    nx: int = gx + dx
-                    ny: int = gy + dy
-                    self.reveal_cell(nx, ny)
+            for nx, ny in self._iter_neighbor_coords(gx, gy):
+                self.reveal_cell(nx, ny)
         self.save()
-        assert self.parent
-
+        # QA-007: parent is required for refresh; raise rather than assert.
+        if self.parent is None:
+            raise RuntimeError("reveal_surround requires a parent widget for UI refresh")
         self.parent.refresh()
 
     def highlight_neighbors(self, gx: int, gy: int) -> None:
@@ -519,14 +659,13 @@ class GameState:
         if not counts[1]:
             return
 
-        for dx in [-1, 0, 1]:
-            for dy in [-1, 0, 1]:
-                if dx == 0 and dy == 0:
-                    continue
-                cell = self.global_to_cell(gx + dx, gy + dy)
-                if cell and not cell.uncovered:
-                    cell.highlighted = True
-        assert self.parent
+        for nx, ny in self._iter_neighbor_coords(gx, gy):
+            n_cell: Cell | None = self.global_to_cell(nx, ny)
+            if n_cell and not n_cell.uncovered:
+                n_cell.highlighted = True
+        # QA-007: parent is required for refresh; raise rather than assert.
+        if self.parent is None:
+            raise RuntimeError("highlight_neighbors requires a parent widget for UI refresh")
         self.parent.refresh()
 
     def toggle_mark(self, gx: int, gy: int, surround: bool = False) -> None:
@@ -549,7 +688,9 @@ class GameState:
         cell.marked = not cell.marked
         self.save()
 
-        assert self.parent
+        # QA-007: parent is required for refresh; raise rather than assert.
+        if self.parent is None:
+            raise RuntimeError("toggle_mark requires a parent widget for UI refresh")
         self.parent.refresh()
 
     def check_subgrid_solved(self, sg_coord: GridPos) -> None:

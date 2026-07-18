@@ -49,7 +49,7 @@ class UrlDialog(ModalScreen[None]):
         Binding("escape", "dismiss(None)", "", show=False),
     ]
 
-    def __init__(self, title: TextType, message: ConsoleRenderable | RichCast | str | SupportsVisual, url: str) -> None:  # noqa: F821
+    def __init__(self, title: TextType, message: ConsoleRenderable | RichCast | str | SupportsVisual, url: str) -> None:
         """Initialise the dialog."""
         super().__init__()
         self._title = title

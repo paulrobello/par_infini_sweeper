@@ -50,7 +50,7 @@ class TextDialog(ModalScreen[None]):
         Binding("escape", "dismiss(None)", "", show=False),
     ]
 
-    def __init__(self, title: TextType, message: ConsoleRenderable | RichCast | str | SupportsVisual) -> None:  # noqa: F821
+    def __init__(self, title: TextType, message: ConsoleRenderable | RichCast | str | SupportsVisual) -> None:
         """Initialise the dialog."""
         super().__init__()
         self._title = title

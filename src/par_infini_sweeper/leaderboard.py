@@ -5,17 +5,14 @@ previously made against the leaderboard service. They've been pulled out of
 ``GameState`` so the model class is no longer wired to ``os.environ`` /
 ``authlib`` / the request/response models. ``GameState.post_internet_score``
 and ``GameState.change_internet_nickname`` are now one-line delegates.
-
-Bodies are byte-for-byte equivalent to the originals — including the
-``# type: ignore[reportAttributeAccessIssue]`` notes on ``auth_client.post``
-(``auth_client`` is typed as the return of ``build_auth_client``, which
-pyright can't narrow to a method-bearing type).
 """
 
 from __future__ import annotations
 
 import os
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
+
+import requests
 
 from par_infini_sweeper.models import ChangeNicknameRequest, ChangeNicknameResponse, PostScoreRequest, PostScoreResult
 
@@ -23,6 +20,27 @@ if TYPE_CHECKING:
     # TYPE_CHECKING-only so leaderboard.py has no runtime dependency on the
     # model module — breaks the otherwise-circular ``game.state ↔ leaderboard`` edge.
     from par_infini_sweeper.game.state import GameState
+
+
+def _auth_post(state: GameState, url: str, *, data: str) -> requests.Response:
+    """POST ``data`` to ``url`` using ``state``'s auth-bearing session.
+
+    QA-005: ``authlib.integrations.requests_client.OAuth2Session`` proxies
+    ``requests.Session`` at runtime (so ``.post`` is callable) but its type
+    stubs do not surface that inheritance, which left per-call-site
+    ``# type: ignore[reportAttributeAccessIssue]`` markers on every leaderboard
+    HTTP call. Routing through here narrows once via ``cast`` so call sites
+    get a typed ``requests.Response`` and no suppressions are needed.
+
+    Args:
+        state (GameState): Game state whose ``auth_client`` carries the bearer token.
+        url (str): Absolute leaderboard URL.
+        data (str): JSON body to send.
+
+    Returns:
+        requests.Response: The HTTP response.
+    """
+    return cast(requests.Session, state.auth_client).post(url, data=data)
 
 
 def post_internet_score(state: GameState) -> PostScoreResult:
@@ -38,7 +56,8 @@ def post_internet_score(state: GameState) -> PostScoreResult:
         raise Exception("User is not logged in")
     url = os.environ.get("PIM_LEADERBOARD_URL", "https://pim.pardev.net") + "/score"
 
-    res = state.auth_client.post(  # type: ignore[reportAttributeAccessIssue]
+    res = _auth_post(
+        state,
         url,
         data=PostScoreRequest(
             mode=state.mode.value,
@@ -68,7 +87,7 @@ def change_internet_nickname(state: GameState, nickname: str) -> ChangeNicknameR
         raise Exception("User is not logged in")
     url = os.environ.get("PIM_LEADERBOARD_URL", "https://pim.pardev.net") + "/nickname"
 
-    res = state.auth_client.post(url, data=ChangeNicknameRequest(nickname=nickname).model_dump_json()).json()  # type: ignore[reportAttributeAccessIssue]
+    res = _auth_post(state, url, data=ChangeNicknameRequest(nickname=nickname).model_dump_json()).json()
     if "detail" in res:
         raise Exception(res["detail"] or "Unknown server error")
 

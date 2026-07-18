@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import logging
+import sqlite3
+
+import requests
 from textual import on, work
 from textual.app import ComposeResult
 from textual.binding import Binding
@@ -14,6 +18,8 @@ from par_infini_sweeper.data_structures import GameState
 from par_infini_sweeper.dialogs.login_dialog import AuthDialog
 from par_infini_sweeper.enums import GameMode
 from par_infini_sweeper.utils import escape_brackets, format_duration
+
+logger = logging.getLogger(__name__)
 
 
 class HighscoreDialog(ModalScreen[None]):
@@ -57,7 +63,7 @@ class HighscoreDialog(ModalScreen[None]):
         Binding("q,escape", "dismiss(None)", "Return", show=True),
     ]
 
-    def __init__(self, game_state: GameState, show_internet: bool = False) -> None:  # noqa: F821
+    def __init__(self, game_state: GameState, show_internet: bool = False) -> None:
         """Initialise the dialog."""
         super().__init__()
         self.game_state = game_state
@@ -80,7 +86,10 @@ class HighscoreDialog(ModalScreen[None]):
                 table.clear(True)
                 table.add_columns(*rows[0])
                 table.add_rows(rows[1:])
-        except Exception as _:
+        except sqlite3.Error:
+            # QA-004: local DB read failed — surface to the user and log the
+            # specifics so a corrupted highscores table is diagnosable.
+            logger.exception("failed to load local highscores")
             self.notify("Error loading remote data", severity="error")
         finally:
             self.query_exactly_one("#local_vs", VerticalScroll).loading = False
@@ -122,8 +131,11 @@ class HighscoreDialog(ModalScreen[None]):
                 table.add_columns(*rows[0])
                 table.add_rows(rows[1:])
                 self.notify("Loaded remote data")
-        except Exception as e:
-            # self.notify("Error loading remote data", severity="error")
+        except (requests.RequestException, ValueError) as e:
+            # QA-004: remote leaderboard unreachable (RequestException) or
+            # returned malformed JSON (ValueError from .json()). Surface the
+            # specifics to the user; log for diagnostics.
+            logger.warning("failed to load internet highscores: %r", e, exc_info=True)
             self.notify(escape_brackets(str(e)), severity="error")
         finally:
             self.query_exactly_one("#internet_vs", VerticalScroll).loading = False

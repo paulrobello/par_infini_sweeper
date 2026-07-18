@@ -1,4 +1,4 @@
-"""Par LLAMA TUI dialogs package."""
+"""Par Infinite Minesweeper TUI dialogs package."""
 
 from __future__ import annotations
 

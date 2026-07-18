@@ -75,6 +75,7 @@ __pypackages__/
 /history.json
 **/.ruff_cache/
 **/*~
+*.bak
 **/.DS_Store
 **/ls_volume
 **/.terraform
