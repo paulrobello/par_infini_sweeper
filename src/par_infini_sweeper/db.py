@@ -1,6 +1,7 @@
 import base64
 import os
 import sqlite3
+import sys
 from pathlib import Path
 from sqlite3 import Connection, Cursor
 from typing import Any
@@ -137,9 +138,23 @@ def init_db(conn: Connection, username: str = "user", nickname: str | None = Non
             )
         """)
 
-        # update usernames and nicknames to be no longer than 30 characters
+        # SEC-009: nickname cap is 20 (SEC-006 / validate_nickname) — warn
+        # instead of silently truncating, and use the canonical limit so
+        # migration matches the validator. Username keeps its prior 30-char
+        # truncation (not in scope for SEC-009). Both run on every init_db
+        # against a pre-existing users table; rows already in range are no-ops.
         if users_exists:
-            cursor.execute("UPDATE users SET username = substr(username, 1, 30), nickname = substr(nickname, 1, 30)")
+            cursor.execute("UPDATE users SET username = substr(username, 1, 30)")
+            cursor.execute("SELECT nickname FROM users WHERE length(nickname) > 20")
+            overlong_nicknames = [str(row[0]) for row in cursor.fetchall()]
+            if overlong_nicknames:
+                print(
+                    "warning: truncating "
+                    f"{len(overlong_nicknames)} nickname(s) to the 20-char "
+                    f"limit (validate_nickname rejects >20): {overlong_nicknames}",
+                    file=sys.stderr,
+                )
+            cursor.execute("UPDATE users SET nickname = substr(nickname, 1, 20)")
 
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS users (

@@ -69,6 +69,15 @@ def main(
             raise typer.Exit(1) from e
 
     if start_server:
+        # SEC-010: --server serves the TUI over HTTP with no authentication.
+        # textual-serve binds to localhost, but anyone who can reach this
+        # host (other local users, port-forwarded or NAT'd peers, browser
+        # extensions on the same origin) can view and control the game.
+        console.print(
+            "warning: --server mode serves the TUI via an unauthenticated "
+            "web server (localhost-only). Anyone who can reach this host can "
+            "view and control the game — do not expose it to untrusted networks."
+        )
         server_args: list[str] = ["pim"]
         if user_name:
             server_args.extend(["--user", user_name])
