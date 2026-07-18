@@ -3,8 +3,12 @@ default_language_version:
     python: python3.12
 fail_fast: false
 repos:
+-   repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.0
+    hooks:
+    -   id: gitleaks
 -   repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.6.0
+    rev: v6.0.0
     hooks:
     -   id: check-merge-conflict
     -   id: detect-private-key

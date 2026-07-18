@@ -357,7 +357,7 @@ class GameState:
             raise Exception("User is not logged in")
         url = os.environ.get("PIM_LEADERBOARD_URL", "https://pim.pardev.net") + "/nickname"
 
-        res = self.auth_client.post(url, data=ChangeNicknameRequest(nickname=nickname).model_dump_json()).json()
+        res = self.auth_client.post(url, data=ChangeNicknameRequest(nickname=nickname).model_dump_json()).json()  # type: ignore[reportAttributeAccessIssue]
         if "detail" in res:
             raise Exception(res["detail"] or "Unknown server error")
 
@@ -849,7 +849,7 @@ class GameState:
             raise Exception("User is not logged in")
         url = os.environ.get("PIM_LEADERBOARD_URL", "https://pim.pardev.net") + "/score"
 
-        res = self.auth_client.post(
+        res = self.auth_client.post(  # type: ignore[reportAttributeAccessIssue]
             url,
             data=PostScoreRequest(
                 mode=self.mode.value,
