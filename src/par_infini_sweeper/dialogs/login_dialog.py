@@ -16,6 +16,7 @@ from textual.widgets import Button, Footer, Label, Static
 
 from par_infini_sweeper.data_structures import GameState
 from par_infini_sweeper.dialogs.input_dialog import InputDialog
+from par_infini_sweeper.models import validate_nickname
 from par_infini_sweeper.utils import escape_brackets
 
 
@@ -182,8 +183,13 @@ class AuthDialog(ModalScreen[None]):
                 "Name may only contain letters, numbers and . - _  \n",
             )
         )
-        if not new_nickname or len(new_nickname) < 2 or len(new_nickname) > 30:
-            self.notify("Nickname must be between 2 and 30 characters", severity="error")
+        if not new_nickname:
+            self.notify("Nickname is required", severity="error")
+            return
+        try:
+            validate_nickname(new_nickname)
+        except ValueError as e:
+            self.notify(str(e), severity="error")
             return
         try:
             result = self.game_state.change_internet_nickname(new_nickname)

@@ -14,6 +14,7 @@ from par_infini_sweeper.enums import GameDifficulty, GameMode
 from par_infini_sweeper.models import (
     ScoreData,
     ScoreDataResponse,
+    validate_nickname,
 )
 
 db_folder_old = Path(f"~/.{__application_binary__}").expanduser()
@@ -36,16 +37,27 @@ def get_db_connection() -> sqlite3.Connection:
     Return a connection to the SQLite database with a 5 sec timeout.
     Also creates a backup of the database if it doesn't exist or if it's older than 1 day.
     """
-    db_folder.mkdir(parents=True, exist_ok=True)
+    # mode= alone is umask-affected on POSIX; chmod after to guarantee 0o700 so
+    # other local users cannot read/overwrite the token-bearing DB folder.
+    db_folder.mkdir(parents=True, exist_ok=True, mode=0o700)
+    os.chmod(db_folder, 0o700)
     if db_path.exists():
         if not db_bak_path.exists():
             db_bak_path.write_bytes(db_path.read_bytes())
+            os.chmod(db_bak_path, 0o600)
         else:
             # if backup is older than 1 day, replace it with the current db
             if db_bak_path.stat().st_mtime < (db_path.stat().st_mtime - 86400):
                 db_bak_path.write_bytes(db_path.read_bytes())
+                os.chmod(db_bak_path, 0o600)
 
     conn = sqlite3.connect(db_path, timeout=5)
+    # Restrict the live DB to owner-only — it stores OAuth access / refresh /
+    # id tokens (refresh_token is long-lived via offline_access). chmod after
+    # connect so an already-existing file is also tightened.
+    # TODO(keyring): move refresh_token out of SQLite entirely and into the OS
+    #   keychain (`keyring` library) — file-mode hardening is a stopgap.
+    os.chmod(db_path, 0o600)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -64,8 +76,8 @@ def init_db(conn: Connection, username: str = "user", nickname: str | None = Non
     if len(username) > 20:
         raise ValueError("Username must be 20 characters or less")
 
-    if nickname and len(nickname) > 20:
-        raise ValueError("Nickname must be 20 characters or less")
+    if nickname:
+        validate_nickname(nickname)
 
     conn = conn or get_db_connection()
     with conn:

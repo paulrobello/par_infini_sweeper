@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import http.server
 import os
+import secrets
 import socketserver
+import sys
 import threading
 import webbrowser
 from typing import Any
+from urllib.parse import urlparse
 
 from authlib.integrations.requests_client import OAuth2Session
 from textual.app import App
@@ -17,6 +20,12 @@ AUTH0_DOMAIN = os.environ.get("AUTH0_DOMAIN", "par-dev.us.auth0.com")
 AUTH0_CLIENT_ID = os.environ.get("AUTH0_CLIENT_ID", "79LqAgzljQjin3dihidWdmLSD7o4CpL5")
 API_AUDIENCE = "PIM"
 REDIRECT_URI = "http://127.0.0.1:1999/oauth/callback"
+# Pinned loopback authority used to build `authorization_response`. We must not
+# reflect the request's `Host` header here: a forged Host (e.g. from a malicious
+# page redirecting to the loopback listener) would otherwise be passed verbatim
+# into authlib's `parse_authorization_code_response`, allowing attacker-controlled
+# authority injection. Deriving from REDIRECT_URI keeps the single source of truth.
+LOOPBACK_AUTHORITY = urlparse(REDIRECT_URI).netloc
 
 
 def build_auth_client(user: dict[str, Any], app: App) -> OAuth2Session:
@@ -73,12 +82,21 @@ def build_auth_client(user: dict[str, Any], app: App) -> OAuth2Session:
 
 
 def start_auth_server(client: OAuth2Session, user: dict[str, Any], app: App) -> OAuth2Session:
+    # PKCE: this is a public native/desktop client, so RFC 7636 code_verifier is
+    # mandatory. Generate once here; the same value is passed to both
+    # create_authorization_url (which derives code_challenge=S256) and fetch_token
+    # (which redeems it). Without PKCE, anyone who observes the authorization
+    # code can redeem it.
+    code_verifier = secrets.token_urlsafe(64)
+
     def login() -> Any:
         """
         Initiate Auth0 OAuth login by redirecting the user to the Auth0 login page.
         """
         authorization_url, state = client.create_authorization_url(
-            f"https://{AUTH0_DOMAIN}/authorize", audience=API_AUDIENCE
+            f"https://{AUTH0_DOMAIN}/authorize",
+            audience=API_AUDIENCE,
+            code_verifier=code_verifier,
         )
         if not webbrowser.open(authorization_url):
             app.post_message(ShowURL(authorization_url))
@@ -88,15 +106,21 @@ def start_auth_server(client: OAuth2Session, user: dict[str, Any], app: App) -> 
             """Handle the OAuth callback from Auth0.
             This function exchanges the authorization code for tokens and stores the tokens in the db.
             """
-            # Allow any request path that starts with "/oauth/callback"
-            if not self.path.startswith("/oauth/callback"):
+            # Match the callback path exactly (ignoring the query string). A loose
+            # `startswith` would also accept `/oauth/callbackXYZ`; an early return
+            # ensures stray paths can't fall through to the token exchange block.
+            request_path = urlparse(self.path).path
+            if request_path != "/oauth/callback":
                 self.send_error(404, "Not Found")
+                return
             try:
-                # Include query parameters in the authorization_response URL
-                authorization_response = f"http://{self.headers['Host']}{self.path}"
+                # Build authorization_response from the pinned loopback authority
+                # rather than the request's Host header — see LOOPBACK_AUTHORITY.
+                authorization_response = f"http://{LOOPBACK_AUTHORITY}{self.path}"
                 token = client.fetch_token(
                     f"https://{AUTH0_DOMAIN}/oauth/token",
                     authorization_response=authorization_response,
+                    code_verifier=code_verifier,
                 )
                 user["id_token"] = token.get("id_token")
                 user["access_token"] = token.get("access_token")
@@ -105,7 +129,12 @@ def start_auth_server(client: OAuth2Session, user: dict[str, Any], app: App) -> 
 
                 db.save_user(user)
             except Exception as e:
-                self.send_error(500, str(e))
+                # Log the raw exception for diagnostics, but do NOT echo it to
+                # the HTTP response body — anyone reaching the loopback callback
+                # (e.g. via a browser redirect) would otherwise be able to
+                # fingerprint the auth setup via the error text.
+                print(f"oauth callback error: {e!r}", file=sys.stderr)
+                self.send_error(500, "Authentication failed")
                 return
 
             self.send_response(200)

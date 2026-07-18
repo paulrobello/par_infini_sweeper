@@ -10,6 +10,7 @@ from rich.console import Console
 from textual_serve.server import Server
 
 from par_infini_sweeper import __application_title__, __version__
+from par_infini_sweeper.models import validate_nickname
 from par_infini_sweeper.pim_app import PimApp
 
 app = typer.Typer()
@@ -40,9 +41,12 @@ def main(
     if user_name and len(user_name) > 20:
         console.print("User name must be 20 characters or less")
         raise typer.Exit(1)
-    if nickname and len(nickname) > 20:
-        console.print("Nickname must be 20 characters or less")
-        raise typer.Exit(1)
+    if nickname:
+        try:
+            validate_nickname(nickname)
+        except ValueError as e:
+            console.print(str(e))
+            raise typer.Exit(1) from e
 
     if start_server:
         server_args: list[str] = ["pim"]

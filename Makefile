@@ -63,12 +63,20 @@ shell:			# Start shell inside of .venv
 # Checking/testing/linting/etc.
 
 .PHONY: format
-format:                         # Reformat the code with ruff.
+format:                         # Reformat the code with ruff (local use: mutates files).
 	$(ruff) format src/$(lib)
 
+.PHONY: format-check
+format-check:                   # CI-safe format check (does NOT mutate files).
+	$(ruff) format --check src/$(lib)
+
 .PHONY: lint
-lint:                           # Run ruff lint over the library
+lint:                           # Run ruff lint and apply fixes (local use: mutates files).
 	$(ruff) check src/$(lib) --fix
+
+.PHONY: lint-check
+lint-check:                     # CI-safe lint check (does NOT mutate files).
+	$(ruff) check src/$(lib)
 
 .PHONY: lint-unsafe
 lint-unsafe:                           # Run ruff lint over the library
@@ -87,7 +95,7 @@ test:			# Run tests
 	@echo "No tests configured yet"
 
 .PHONY: checkall
-checkall: format lint typecheck 	        # Check all the things
+checkall: format-check lint-check typecheck 	        # CI-safe: validate the committed tree without mutating it.
 
 .PHONY: pre-commit	        # run pre-commit checks on all files
 pre-commit:
