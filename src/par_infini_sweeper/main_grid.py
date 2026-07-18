@@ -121,33 +121,42 @@ class MainGrid(Widget, can_focus=True):
         await self.app.push_screen_wait(InformationDialog("Paused", "Press ESC to continue"))
         self.game_state.paused = False
 
-    def handle_click(self, event: MouseDown | MouseUp) -> None:
+    def handle_click(self, event: MouseDown | MouseUp, x: int, y: int) -> None:
         """
         Handle a click event by converting the event position to a global cell coordinate.
         Left-click reveals a cell; middle-click toggles a mark.
 
         Args:
-            event (MouseDown | MouseUp): The mouse event
+            event (MouseDown | MouseUp): The mouse event (for button / modifier state).
+            x (int): Padding-adjusted widget-local x coordinate.
+            y (int): Padding-adjusted widget-local y coordinate.
         """
         if self.is_dragging:
             return
-        gx, gy = self.game_state.mouse_to_global_grid_coords(event)
+        gx, gy = self.game_state.mouse_to_global_grid_coords(x, y)
         if event.button == 1 and not (event.shift or event.ctrl):
             self.game_state.reveal_cell(gx, gy)
             self.game_state.first_click = False
         elif event.button == 1 and (event.shift or event.ctrl):
             self.game_state.toggle_mark(gx, gy, True)
 
-    def adjust_mouse_pos(self, event: MouseEvent) -> None:
+    def adjust_mouse_pos(self, event: MouseEvent) -> GridPos:
         """
-        Adjust the mouse position to account for padding and cell size.
+        Return the mouse position adjusted for widget padding and cell size.
 
         Args:
-            event (MouseEvent): The mouse event
+            event (MouseEvent): The mouse event.
+
+        Returns:
+            GridPos: The padding-adjusted ``(x, y)`` widget-local coordinates.
 
         """
-        event._x -= self.styles.padding.width + 1
-        event._y -= self.styles.padding.height + 1
+        # ARC-005: previously mutated ``event._x`` / ``event._y`` directly,
+        # which would silently break on a Textual upgrade — MouseEvent exposes
+        # ``x`` / ``y`` as read-only properties with no public setter, and the
+        # private ``_x`` / ``_y`` storage is an implementation detail. Compute
+        # into a local instead; callers pass the result through to GameState.
+        return event.x - (self.styles.padding.width + 1), event.y - (self.styles.padding.height + 1)
 
     def on_mouse_down(self, event: MouseDown) -> None:
         """
@@ -156,11 +165,11 @@ class MainGrid(Widget, can_focus=True):
         Args:
             event (MouseDown): The mouse down event
         """
-        self.adjust_mouse_pos(event)
-        self.drag_start = event.x, event.y
+        x, y = self.adjust_mouse_pos(event)
+        self.drag_start = x, y
 
         if event.button == 1 and (event.shift or event.ctrl):
-            gx, gy = self.game_state.mouse_to_global_grid_coords(event)
+            gx, gy = self.game_state.mouse_to_global_grid_coords(x, y)
             self.game_state.highlight_neighbors(gx, gy)
 
     def on_mouse_move(self, event: MouseMove) -> None:
@@ -170,15 +179,15 @@ class MainGrid(Widget, can_focus=True):
         Args:
             event (MouseMove): The mouse move event
         """
-        self.adjust_mouse_pos(event)
-        self.game_state.update_mouse_info(event)
+        x, y = self.adjust_mouse_pos(event)
+        self.game_state.update_mouse_info(x, y, event.shift, event.ctrl)
         if self.drag_start is not None:
-            dx: int = event.x - self.drag_start[0]
-            dy: int = event.y - self.drag_start[1]
+            dx: int = x - self.drag_start[0]
+            dy: int = y - self.drag_start[1]
             if abs(dx) >= self.drag_threshold or abs(dy) >= self.drag_threshold:
                 # Update the view offset in the opposite direction of the drag.
                 self.game_state.offset -= Offset(dx, dy)
-                self.drag_start = (event.x, event.y)
+                self.drag_start = (x, y)
                 self.is_dragging = True
                 self.refresh()
 
@@ -195,14 +204,14 @@ class MainGrid(Widget, can_focus=True):
             self.is_dragging = False
             return
 
-        self.adjust_mouse_pos(event)
+        x, y = self.adjust_mouse_pos(event)
         # ARC-014: removed a no-op ``self.game_state.offset = self.game_state.offset``
         # self-assignment that was sitting between adjust_mouse_pos and the
         # drag-vs-click branch — it did nothing but suggest intent. If the
         # intent was to recompute the offset after adjusting event.x/y, that
         # already happens inside ``mouse_to_global_grid_coords`` at click time.
         if self.drag_start is not None:
-            self.handle_click(event)
+            self.handle_click(event, x, y)
         self.drag_start = None
         self.is_dragging = False
         self.game_state.clear_highlighted()
