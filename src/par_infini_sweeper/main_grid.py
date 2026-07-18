@@ -47,7 +47,13 @@ class MainGrid(Widget, can_focus=True):
 
     def update_info(self) -> None:
         """Update the info bar with the current game state."""
-        if not self.game_state.game_over and not self.game_state.paused:
+        # ARC-013: only advance the play-time counter while the grid is
+        # focused/active. ``set_interval(1, ...)`` fires regardless of focus,
+        # so without this guard the timer keeps counting during dialogs (pause,
+        # auth, highscores, etc.) and while the terminal is backgrounded —
+        # desyncing ``duration`` from real play time. ``paused`` is also
+        # checked for the explicit pause path; ``has_focus`` covers the rest.
+        if not self.game_state.game_over and not self.game_state.paused and self.has_focus:
             self.game_state.duration += 1
 
         game_over_text = "" if not self.game_state.game_over else " - [red]Game Over![/]"
@@ -166,13 +172,6 @@ class MainGrid(Widget, can_focus=True):
         """
         self.adjust_mouse_pos(event)
         self.game_state.update_mouse_info(event)
-        # cell = self.game_state.global_to_cell(self.sg_coord)
-        # if cell:
-        #     if self.mouse_sg != cell.parent:
-        #         if self.mouse_sg:
-        #             self.mouse_sg.highlighted = False
-        #         self.mouse_sg = cell.parent
-        #         self.mouse_sg.highlighted = True
         if self.drag_start is not None:
             dx: int = event.x - self.drag_start[0]
             dy: int = event.y - self.drag_start[1]
@@ -197,7 +196,11 @@ class MainGrid(Widget, can_focus=True):
             return
 
         self.adjust_mouse_pos(event)
-        self.game_state.offset = self.game_state.offset
+        # ARC-014: removed a no-op ``self.game_state.offset = self.game_state.offset``
+        # self-assignment that was sitting between adjust_mouse_pos and the
+        # drag-vs-click branch — it did nothing but suggest intent. If the
+        # intent was to recompute the offset after adjusting event.x/y, that
+        # already happens inside ``mouse_to_global_grid_coords`` at click time.
         if self.drag_start is not None:
             self.handle_click(event)
         self.drag_start = None

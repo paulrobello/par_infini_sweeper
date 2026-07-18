@@ -14,18 +14,50 @@ from authlib.integrations.requests_client import OAuth2Session
 from textual.app import App
 
 from par_infini_sweeper import db
-from par_infini_sweeper.messages import ShowURL, WebServerStarted, WebServerStopped
+from par_infini_sweeper.messages import AuthServerError, ShowURL, WebServerStarted, WebServerStopped
 
+# Production Auth0 tenant + client ID. Local dev should override BOTH via env
+# (e.g. point at a test tenant). See warn_if_default_auth0_client_id() for the
+# one-time stderr nudge when AUTH0_CLIENT_ID is unset (ARC-019).
 AUTH0_DOMAIN = os.environ.get("AUTH0_DOMAIN", "par-dev.us.auth0.com")
-AUTH0_CLIENT_ID = os.environ.get("AUTH0_CLIENT_ID", "79LqAgzljQjin3dihidWdmLSD7o4CpL5")
+_DEFAULT_AUTH0_CLIENT_ID = "79LqAgzljQjin3dihidWdmLSD7o4CpL5"
+AUTH0_CLIENT_ID = os.environ.get("AUTH0_CLIENT_ID", _DEFAULT_AUTH0_CLIENT_ID)
 API_AUDIENCE = "PIM"
-REDIRECT_URI = "http://127.0.0.1:1999/oauth/callback"
+# ARC-018: loopback callback port. Hardcoded for now (Auth0's allowed callback
+# URL list is per-client); SO_REUSEADDR is enabled via ReusableTCPServer below,
+# and the port-in-use case is surfaced via AuthServerError instead of crashing.
+OAUTH_CALLBACK_PORT = 1999
+REDIRECT_URI = f"http://127.0.0.1:{OAUTH_CALLBACK_PORT}/oauth/callback"
 # Pinned loopback authority used to build `authorization_response`. We must not
 # reflect the request's `Host` header here: a forged Host (e.g. from a malicious
 # page redirecting to the loopback listener) would otherwise be passed verbatim
 # into authlib's `parse_authorization_code_response`, allowing attacker-controlled
 # authority injection. Deriving from REDIRECT_URI keeps the single source of truth.
 LOOPBACK_AUTHORITY = urlparse(REDIRECT_URI).netloc
+
+_default_auth0_client_id_warned = False
+
+
+def warn_if_default_auth0_client_id() -> None:
+    """Print a one-time stderr warning when the production Auth0 client ID is
+    in use because ``AUTH0_CLIENT_ID`` was not set in the environment.
+
+    ARC-019: the hardcoded default means local dev hits the production auth
+    tenant by default. The warning is idempotent (fires at most once per
+    process) and routed to stderr so it doesn't pollute the TUI / structured
+    stdout. Imported and called from ``__main__.main`` so it only fires for
+    real launches, not on every ``import par_infini_sweeper.*``.
+    """
+    global _default_auth0_client_id_warned
+    if _default_auth0_client_id_warned:
+        return
+    _default_auth0_client_id_warned = True
+    if "AUTH0_CLIENT_ID" not in os.environ:
+        print(
+            "warning: AUTH0_CLIENT_ID not set; using the production Auth0 tenant "
+            f"({AUTH0_DOMAIN}). Set AUTH0_CLIENT_ID (and AUTH0_DOMAIN) for local dev.",
+            file=sys.stderr,
+        )
 
 
 def build_auth_client(user: dict[str, Any], app: App) -> OAuth2Session:
@@ -50,8 +82,14 @@ def build_auth_client(user: dict[str, Any], app: App) -> OAuth2Session:
         token=token_data,
     )
     if client.token:
-        # if auth token does not exist or is expired and we have a refresh token, refresh it
-        if client.token.is_expired() in [None, True] and client.token["refresh_token"]:
+        # ARC-012: ``is_expired()`` may return True / False / None (unknown
+        # when expiry can't be determined). The previous ``in [None, True]``
+        # was correct but obscure — spell out "expired OR unknown" so the
+        # refresh condition is readable. Refresh only when we have a
+        # refresh_token to redeem (offline_access scope).
+        token_expired = client.token.is_expired()
+        needs_refresh = token_expired is None or token_expired is True
+        if needs_refresh and client.token["refresh_token"]:
             try:
                 refresh_token_url = f"https://{AUTH0_DOMAIN}/oauth/token"
 
@@ -147,12 +185,32 @@ def start_auth_server(client: OAuth2Session, user: dict[str, Any], app: App) -> 
         def shutdown_server(self):
             self.server.shutdown()
 
-    with socketserver.TCPServer(("127.0.0.1", 1999), OAuthCallbackHandler) as httpd:
-        try:
-            app.post_message(WebServerStarted(httpd))
-            login()
-            httpd.serve_forever()
-        finally:
-            app.post_message(WebServerStopped())
+    # ARC-018: enable SO_REUSEADDR so a previous pim process leaving the
+    # loopback socket in TIME_WAIT doesn't fail the bind on the next launch.
+    # ``allow_reuse_address = True`` makes socketserver set SO_REUSEADDR before
+    # the bind call (it does NOT enable SO_REUSEPORT — port collisions with a
+    # still-living listener still raise, which is what we want).
+    class ReusableTCPServer(socketserver.TCPServer):
+        allow_reuse_address = True
+
+    # ARC-018: surface a clear error to the UI when port 1999 is already in use
+    # (another pim mid-auth, a stray process, etc.) instead of letting the
+    # OSError propagate and crash the auth flow.
+    try:
+        with ReusableTCPServer(("127.0.0.1", OAUTH_CALLBACK_PORT), OAuthCallbackHandler) as httpd:
+            try:
+                app.post_message(WebServerStarted(httpd))
+                login()
+                httpd.serve_forever()
+            finally:
+                app.post_message(WebServerStopped())
+    except OSError as e:
+        print(f"oauth callback listener failed to bind: {e!r}", file=sys.stderr)
+        app.post_message(
+            AuthServerError(
+                f"Could not start the OAuth callback listener on port {OAUTH_CALLBACK_PORT}: {e}. "
+                "Another pim process may already be authenticating; close it and retry."
+            )
+        )
 
     return client

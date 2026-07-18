@@ -28,12 +28,13 @@ from par_infini_sweeper.data_structures import GameState
 from par_infini_sweeper.dialogs.difficulty_dialog import DifficultyDialog
 from par_infini_sweeper.dialogs.help_dialog import HelpDialog
 from par_infini_sweeper.dialogs.highscore_dialog import HighscoreDialog
+from par_infini_sweeper.dialogs.information import InformationDialog
 from par_infini_sweeper.dialogs.login_dialog import AuthDialog
 from par_infini_sweeper.dialogs.theme_dialog import ThemeDialog
 from par_infini_sweeper.dialogs.url_dialog import UrlDialog
 from par_infini_sweeper.enums import GameDifficulty
 from par_infini_sweeper.main_grid import MainGrid
-from par_infini_sweeper.messages import ShowURL, WebServerStarted, WebServerStopped
+from par_infini_sweeper.messages import AuthServerError, ShowURL, WebServerStarted, WebServerStopped
 
 
 class PimApp(App):
@@ -63,16 +64,18 @@ class PimApp(App):
     def __init__(self, user_name: str | None = None, nickname: str | None = None, **kwargs: Any) -> None:
         if not user_name:
             user_name = os.environ.get("USER", "user")
-        from par_infini_sweeper import db
-
-        with db.get_db_connection() as conn:
-            db.init_db(conn, user_name)
-
+        # ARC-017: heavy DB I/O deferred to on_mount so construction is cheap
+        # and the event loop starts before SQLite/auth bootstrap runs. The
+        # previous constructor opened a connection, ran init_db (DDL +
+        # migrations), and ran GameState.load (multiple SELECTs) — all
+        # synchronously before run() could paint the first frame.
+        self._user_name: str = user_name
+        self._nickname: str | None = nickname
         super().__init__(**kwargs)
         self.info = Static("Info", id="info")
         self.debug_panel = Static("Debug", id="debug")
-        self.game_state = GameState.load(None, user_name, nickname)
-        self.sweeper_widget = MainGrid(self.game_state, self.info, self.debug_panel)
+        self.game_state: GameState | None = None
+        self.sweeper_widget: MainGrid | None = None
         self._web_server: socketserver.TCPServer | None = None
 
     def compose(self) -> ComposeResult:
@@ -81,16 +84,32 @@ class PimApp(App):
         with Vertical():
             yield self.info
             with Horizontal():
-                yield self.sweeper_widget
+                # sweeper_widget is mounted dynamically by on_mount once the
+                # deferred DB I/O completes (ARC-017). Yield debug_panel now so
+                # the layout is stable before the game state loads.
                 yield self.debug_panel
 
     def on_mount(self) -> None:
+        # ARC-006/ARC-007: storage init (mkdir, legacy rename, backup) runs
+        # ONCE at startup, not inside every get_db_connection. ARC-017: DB
+        # I/O moved out of __init__ so construction stays cheap.
+        from par_infini_sweeper import db
+
+        db.init_storage()
+        with db.get_db_connection() as conn:
+            db.init_db(conn, self._user_name)
+        self.game_state = GameState.load(None, self._user_name, self._nickname)
+        self.sweeper_widget = MainGrid(self.game_state, self.info, self.debug_panel)
+        # Insert into the existing Horizontal container, before debug_panel,
+        # so the layout matches the pre-deferral compose tree.
+        self.query_one(Horizontal).mount(self.sweeper_widget, before=self.debug_panel)
         self.theme = self.game_state.theme
         self.sweeper_widget.focus()
 
     @work
     async def action_change_theme(self) -> None:
         """An action to change the theme."""
+        assert self.game_state is not None  # populated by on_mount before any keypress
         self.game_state.theme = await self.push_screen_wait(ThemeDialog())
         self.game_state.save()
 
@@ -100,10 +119,12 @@ class PimApp(App):
 
     def action_highscores(self) -> None:
         """Display the highscores for each game mode."""
+        assert self.game_state is not None  # populated by on_mount before any keypress
         self.app.push_screen(HighscoreDialog(self.game_state))
 
     def action_auth(self) -> None:
         """Display the auth dialog."""
+        assert self.game_state is not None  # populated by on_mount before any keypress
         self.app.push_screen(AuthDialog(self.game_state))
 
     def set_debug(self, text: ConsoleRenderable | RichCast | str | SupportsVisual | Visual) -> None:
@@ -115,6 +136,8 @@ class PimApp(App):
         Start a new game. Prompts the user for a difficulty (easy, medium, or hard),
         resets the game state, and saves it.
         """
+        assert self.game_state is not None  # populated by on_mount before any keypress
+        assert self.sweeper_widget is not None
         difficulty: GameDifficulty | None = await self.push_screen_wait(DifficultyDialog())
         if difficulty is None:
             return
@@ -131,6 +154,11 @@ class PimApp(App):
                 event.url,
             )
         )
+
+    @on(AuthServerError)
+    def auth_server_error(self, event: AuthServerError) -> None:
+        """ARC-018: surface a port-in-use / listener failure to the user."""
+        self.push_screen(InformationDialog("Authentication Error", event.error))
 
     @on(WebServerStarted)
     def webserver_started(self, event: WebServerStarted):

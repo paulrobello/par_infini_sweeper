@@ -1,15 +1,17 @@
 """Pytest configuration for par_infini_sweeper.
 
-Routes around the package's import-time side effects (ARC-007, a later phase,
-eliminates them at the source). Until then we:
+ARC-007 has landed: ``import par_infini_sweeper`` no longer has filesystem /
+env side effects (load_dotenv, mkdir, legacy rename, USER_AGENT write, PimApp
+re-export all moved out of ``__init__.py``). The env setup below stays as a
+defensive safety net for any test code that DOES touch the package's storage
+layer (e.g. via ``get_db_connection`` or ``GameState.load``):
 
-  * Point ``XDG_DATA_HOME`` at a session-scoped tmp dir BEFORE the package is
-    imported, so ``par_infini_sweeper.db`` (which computes ``db_folder`` at
-    import time) writes its SQLite files there instead of polluting the host.
-  * Set ``USER`` so ``__main__`` / ``pim_app`` have a deterministic default.
-  * Set ``PIM_LEADERBOARD_URL`` to a loopback sink so any test that
-    accidentally reaches into the leaderboard client fails fast instead of
-    hitting production.
+  * ``XDG_DATA_HOME`` → session tmp dir, set BEFORE any par_infini_sweeper
+    import so ``par_infini_sweeper.db.db_folder`` (still computed at import
+    time as pure Path math) resolves under it.
+  * ``USER`` → deterministic default for any code path that reads it.
+  * ``PIM_LEADERBOARD_URL`` → loopback sink so an accidental reach into the
+    leaderboard client fails fast instead of hitting production.
 
 Tests that need a per-test SQLite file should use the ``fresh_db_conn``
 fixture rather than touching the package-level data dir directly.

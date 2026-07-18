@@ -17,40 +17,78 @@ from par_infini_sweeper.models import (
     validate_nickname,
 )
 
+# Pure Path math at import time — no filesystem mutation. The legacy rename,
+# mkdir, and backup previously ran HERE at import (ARC-007) and were then
+# re-run inside every ``get_db_connection`` call (ARC-006). Both are now in
+# ``init_storage`` / ``ensure_backup``, called once at app startup.
 db_folder_old = Path(f"~/.{__application_binary__}").expanduser()
 db_folder = xdg_data_home() / __application_binary__
-
-if not db_folder.parent.exists():
-    db_folder.parent.mkdir(parents=True, exist_ok=True)
-
-
-if db_folder_old.exists() and not db_folder.exists():
-    db_folder = db_folder_old.rename(db_folder)
-
-
 db_path = db_folder / "game_data.sqlite"
 db_bak_path = db_folder / "game_data.sqlite.bak"
 
+# Refresh the .bak copy when it is older than the live DB by this margin.
+# Hoisted from the inline 86400 literal so ensure_backup reads from one spot.
+BACKUP_MAX_AGE_SECONDS = 86400
 
-def get_db_connection() -> sqlite3.Connection:
+
+def init_storage() -> None:
+    """Set up the on-disk storage layout and refresh the DB backup.
+
+    Idempotent; call ONCE at app startup (``PimApp.on_mount``) before the first
+    ``get_db_connection`` / ``init_db``. Previously this work ran at import time
+    AND inside every ``get_db_connection`` (ARC-006/ARC-007):
+
+      * Importing ``par_infini_sweeper.db`` used to ``mkdir`` the data folder
+        and rename ``~/.pim`` → XDG — two concurrent ``pim`` processes would
+        race the rename, and any test that imported the package mutated disk.
+      * Every ``get_db_connection`` used to stat the DB and backup, compare
+        mtimes, and periodically ``read_bytes``/``write_bytes`` the whole file.
+        ``get_db_connection`` is called on every save/click, so per-click I/O
+        was significant for an infinite game.
     """
-    Return a connection to the SQLite database with a 5 sec timeout.
-    Also creates a backup of the database if it doesn't exist or if it's older than 1 day.
+    if not db_folder.parent.exists():
+        db_folder.parent.mkdir(parents=True, exist_ok=True)
+    if db_folder_old.exists() and not db_folder.exists():
+        db_folder_old.rename(db_folder)
+    ensure_backup()
+
+
+def ensure_backup() -> None:
+    """Maintain a recent backup of the SQLite DB. Cheap no-op once it's fresh.
+
+    Runs once per launch via ``init_storage`` — NOT inside
+    ``get_db_connection`` (see ARC-006).
     """
     # mode= alone is umask-affected on POSIX; chmod after to guarantee 0o700 so
     # other local users cannot read/overwrite the token-bearing DB folder.
     db_folder.mkdir(parents=True, exist_ok=True, mode=0o700)
     os.chmod(db_folder, 0o700)
-    if db_path.exists():
-        if not db_bak_path.exists():
-            db_bak_path.write_bytes(db_path.read_bytes())
-            os.chmod(db_bak_path, 0o600)
-        else:
-            # if backup is older than 1 day, replace it with the current db
-            if db_bak_path.stat().st_mtime < (db_path.stat().st_mtime - 86400):
-                db_bak_path.write_bytes(db_path.read_bytes())
-                os.chmod(db_bak_path, 0o600)
+    if not db_path.exists():
+        return
+    if not db_bak_path.exists():
+        db_bak_path.write_bytes(db_path.read_bytes())
+        os.chmod(db_bak_path, 0o600)
+        return
+    # Refresh the backup if it's >1 day older than the live DB.
+    if db_bak_path.stat().st_mtime < db_path.stat().st_mtime - BACKUP_MAX_AGE_SECONDS:
+        db_bak_path.write_bytes(db_path.read_bytes())
+        os.chmod(db_bak_path, 0o600)
 
+
+def get_db_connection() -> sqlite3.Connection:
+    """
+    Return a connection to the SQLite database with a 5 sec timeout.
+
+    Backup is NOT checked here — see ``init_storage`` / ``ensure_backup``,
+    which run once at app startup. The previous implementation ran a
+    stat/read/write backup check on every call (ARC-006), and
+    ``get_db_connection`` is hit on every save/click.
+    """
+    # mkdir kept as a defensive minimum so callers that bypass init_storage
+    # (tests, helpers) still get a usable folder. The backup check is NOT
+    # restored here — see init_storage / ensure_backup.
+    db_folder.mkdir(parents=True, exist_ok=True, mode=0o700)
+    os.chmod(db_folder, 0o700)
     conn = sqlite3.connect(db_path, timeout=5)
     # Restrict the live DB to owner-only — it stores OAuth access / refresh /
     # id tokens (refresh_token is long-lived via offline_access). chmod after
@@ -67,7 +105,8 @@ def init_db(conn: Connection, username: str = "user", nickname: str | None = Non
     Initialize the SQLite database with required tables and default user.
 
     Args:
-        conn (Connection): SQLite connection object.
+        conn (Connection): SQLite connection object. Required — every caller
+            passes a live connection (no implicit ``get_db_connection`` fallback).
         username (str): Default username.
         nickname (str | None): Default nickname.
 
@@ -79,7 +118,9 @@ def init_db(conn: Connection, username: str = "user", nickname: str | None = Non
     if nickname:
         validate_nickname(nickname)
 
-    conn = conn or get_db_connection()
+    # ARC-010: conn is required — the previous ``conn = conn or get_db_connection()``
+    # fallback implied None was a valid argument, but every call site passes a
+    # real connection. Removed so the signature reflects the contract.
     with conn:
         cursor = conn.cursor()
 
@@ -208,8 +249,12 @@ def get_user(conn: Connection, username: str = "user", nickname: str | None = No
         cursor.execute("SELECT * FROM users WHERE username = ?", (username,))
         row = cursor.fetchone()
     user = dict(row)
-    user["nickname"] = nickname or user["nickname"]
-    cursor.execute("UPDATE users SET nickname = ? WHERE id = ?", (user["nickname"], user["id"]))
+    # ARC-011: previously this UPDATE ran on every read, even when the value
+    # was unchanged. Only write when the caller actually supplied a new
+    # nickname that differs from the row's current value.
+    if nickname and nickname != user["nickname"]:
+        user["nickname"] = nickname
+        cursor.execute("UPDATE users SET nickname = ? WHERE id = ?", (nickname, user["id"]))
 
     user_id = user["id"]
     cursor.execute("SELECT theme, difficulty FROM user_prefs WHERE id = ?", (user_id,))

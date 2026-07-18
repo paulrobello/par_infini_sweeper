@@ -648,21 +648,26 @@ class GameState:
                 self.parent.refresh()
                 return
             cell.is_mine = False
-            # move mine to a surrounding cell
-            border_cell: Cell | None = None
+            # ARC-015: relocate the mine to the first surrounding non-mine cell.
+            # The previous code declared ``border_cell: Cell | None`` at both
+            # the outer scope and again inside the inner loop, which pyright
+            # flags as a redeclaration (and reads as shadowing). Renamed so the
+            # accumulator (``target``) and each inspected neighbor (``candidate``)
+            # are distinct variables; logic is identical.
+            target: Cell | None = None
             for dx in [-1, 0, 1]:
-                if border_cell:
+                if target:
                     break
                 for dy in [-1, 0, 1]:
                     if dx == 0 and dy == 0:
                         continue
                     nx: int = gx + dx
                     ny: int = gy + dy
-                    border_cell: Cell | None = self.global_to_cell(nx, ny, True)
-                    if border_cell and not border_cell.is_mine:
-                        border_cell.is_mine = True
+                    candidate: Cell | None = self.global_to_cell(nx, ny, True)
+                    if candidate and not candidate.is_mine:
+                        candidate.is_mine = True
+                        target = candidate
                         break
-                    border_cell = None
         # Generate any adjacent subgrids.
         for dx in [-1, 0, 1]:
             for dy in [-1, 0, 1]:
