@@ -33,6 +33,9 @@ jobs:
         run: |
           make checkall
 
+      - name: Test
+        run: make test
+
       - name: Package
         run: make package-all
 

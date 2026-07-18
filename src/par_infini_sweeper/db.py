@@ -199,15 +199,17 @@ def get_user(conn: Connection, username: str = "user", nickname: str | None = No
     """
     cursor: Cursor = conn.cursor()
     cursor.execute("SELECT * FROM users WHERE username = ?", (username,))
-    user = dict(cursor.fetchone())
-    if user is None:
-        # If default user not found, initialize the DB.
+    row = cursor.fetchone()
+    if row is None:
+        # First-time username / typo / missing row: provision it instead of crashing
+        # on dict(None) (ARC-001). The previously-hardcoded "user" lookup is also
+        # fixed to re-fetch the *requested* username.
         init_db(conn, username, nickname)
-        cursor.execute("SELECT id FROM users WHERE username = ?", ("user",))
-        user = dict(cursor.fetchone())
-    else:
-        user["nickname"] = nickname or user["nickname"]
-        cursor.execute("UPDATE users SET nickname = ? WHERE id = ?", (user["nickname"], user["id"]))
+        cursor.execute("SELECT * FROM users WHERE username = ?", (username,))
+        row = cursor.fetchone()
+    user = dict(row)
+    user["nickname"] = nickname or user["nickname"]
+    cursor.execute("UPDATE users SET nickname = ? WHERE id = ?", (user["nickname"], user["id"]))
 
     user_id = user["id"]
     cursor.execute("SELECT theme, difficulty FROM user_prefs WHERE id = ?", (user_id,))
@@ -220,7 +222,9 @@ def get_user(conn: Connection, username: str = "user", nickname: str | None = No
     user["game"] = game
 
     cursor.execute(
-        "SELECT * FROM highscores WHERE game_id=? AND user_id = ? order by created_ts limit 10",
+        # ARC-002: order by score DESC (then created_ts DESC as tiebreaker) so we
+        # return the 10 HIGHEST scores, not the 10 OLDEST.
+        "SELECT * FROM highscores WHERE game_id=? AND user_id = ? ORDER BY score DESC, created_ts DESC LIMIT 10",
         (
             game["id"],
             user_id,

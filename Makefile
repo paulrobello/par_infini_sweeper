@@ -64,23 +64,23 @@ shell:			# Start shell inside of .venv
 
 .PHONY: format
 format:                         # Reformat the code with ruff (local use: mutates files).
-	$(ruff) format src/$(lib)
+	$(ruff) format src/$(lib) tests/
 
 .PHONY: format-check
 format-check:                   # CI-safe format check (does NOT mutate files).
-	$(ruff) format --check src/$(lib)
+	$(ruff) format --check src/$(lib) tests/
 
 .PHONY: lint
 lint:                           # Run ruff lint and apply fixes (local use: mutates files).
-	$(ruff) check src/$(lib) --fix
+	$(ruff) check src/$(lib) tests/ --fix
 
 .PHONY: lint-check
 lint-check:                     # CI-safe lint check (does NOT mutate files).
-	$(ruff) check src/$(lib)
+	$(ruff) check src/$(lib) tests/
 
 .PHONY: lint-unsafe
 lint-unsafe:                           # Run ruff lint over the library
-	$(ruff) check src/$(lib) --fix --unsafe-fixes
+	$(ruff) check src/$(lib) tests/ --fix --unsafe-fixes
 
 .PHONY: typecheck
 typecheck:			# Perform static type checks with pyright
@@ -91,11 +91,11 @@ typecheck-stats:			# Perform static type checks with pyright and print stats
 	$(pyright) --stats
 
 .PHONY: test
-test:			# Run tests
-	@echo "No tests configured yet"
+test:			# Run the pytest suite (QA-001).
+	$(run) pytest
 
 .PHONY: checkall
-checkall: format-check lint-check typecheck 	        # CI-safe: validate the committed tree without mutating it.
+checkall: format-check lint-check typecheck test 	        # CI-safe: validate the committed tree without mutating it.
 
 .PHONY: pre-commit	        # run pre-commit checks on all files
 pre-commit:

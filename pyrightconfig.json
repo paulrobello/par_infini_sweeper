@@ -1,6 +1,7 @@
 {
   "include": [
-    "src/**/*.py"
+    "src/**/*.py",
+    "tests/**/*.py"
   ],
   "exclude": [
     "**/node_modules",

@@ -315,9 +315,11 @@ class GameState:
         try:
             unverified_claims = jwt.get_unverified_claims(self.user["access_token"])
             time_remaining = unverified_claims.get("exp", 0) - int(time.time())
-            # make sure we have a least grace_time seconds left on the token
-            is_expired = time_remaining > grace_time
-            return not is_expired or len(self.user["refresh_token"]) > 0
+            # ARC-003: token is expired once grace_time is exhausted (was inverted —
+            # previously True while healthy). A refresh_token (offline_access) still
+            # lets us transparently renew, so treat that as logged-in.
+            is_expired = time_remaining <= grace_time
+            return (not is_expired) or bool(self.user.get("refresh_token"))
         except Exception as _:
             self.logout()
             return False
@@ -672,6 +674,15 @@ class GameState:
                 if n_sg not in self.subgrids:
                     self.subgrids[n_sg] = SubGrid(self, n_sg, self.difficulty)
                     self.subgrids[n_sg].changed = True
+
+        # QA-002: on the entry call (depth==0) the originally-clicked cell has
+        # already been through the first-click mine-relocation branch above, so
+        # clear the flag NOW — before any recursion — so mines encountered during
+        # the flood fill end the game instead of being silently relocated. The
+        # caller used to clear this only after reveal_cell returned, leaving it
+        # True for the entire opening region.
+        if depth == 0:
+            self.first_click = False
 
         # Prevent infinite recursion by limiting depth.
         if depth < 250:
