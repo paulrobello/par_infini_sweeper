@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Nothing yet.
 
+## [0.4.1] - 2026-07-18
+
+### Security
+
+- Replaced `python-jose` with `PyJWT` to drop the `ecdsa` dependency, which carried a high-severity Minerva timing-attack vulnerability (GHSA-wj6h-64fc-37mp, no upstream fix). The project never used EC/ECDSA algorithms — `ecdsa` was pulled in transitively by `python-jose` and was unused at runtime. This removes `python-jose`, `ecdsa`, `pyasn1`, `rsa`, and `six` from the dependency tree.
+
 ## [0.4.0] - 2026-07-18
 
 Audit remediation (security, correctness, architecture, code quality, documentation) plus cross-platform cell flagging.

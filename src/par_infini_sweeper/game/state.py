@@ -21,8 +21,9 @@ from collections import deque
 from collections.abc import Iterator
 from typing import Any
 
+import jwt
 from authlib.integrations.requests_client import OAuth2Session
-from jose import JWTError, jwt
+from jwt.exceptions import PyJWTError
 from textual.geometry import Offset
 from textual.widget import Widget
 
@@ -193,14 +194,17 @@ class GameState:
         if not self.user["access_token"]:
             return False
         try:
-            unverified_claims = jwt.get_unverified_claims(self.user["access_token"])
+            unverified_claims = jwt.decode(
+                self.user["access_token"],
+                options={"verify_signature": False, "verify_exp": False},
+            )
             time_remaining = unverified_claims.get("exp", 0) - int(time.time())
             # ARC-003: token is expired once grace_time is exhausted (was inverted —
             # previously True while healthy). A refresh_token (offline_access) still
             # lets us transparently renew, so treat that as logged-in.
             is_expired = time_remaining <= grace_time
             return (not is_expired) or bool(self.user.get("refresh_token"))
-        except JWTError:
+        except PyJWTError:
             # QA-004: malformed / tampered / unparsable JWT means the session
             # is invalid — log and tear it down rather than silently swallowing.
             logger.exception("access token failed JWT parsing; logging out")

@@ -21,8 +21,8 @@ import time
 from typing import Any
 from unittest.mock import MagicMock
 
+import jwt
 import pytest
-from jose import jwt
 
 from par_infini_sweeper.data_structures import Cell, GameState, SubGrid
 from par_infini_sweeper.enums import GameDifficulty
@@ -54,8 +54,8 @@ def make_state(parent: Any = None, **user_overrides: Any) -> GameState:
 
 
 def make_token(exp_offset_seconds: int) -> str:
-    """HS256 JWT with the given ``exp`` offset from now. ``get_unverified_claims``
-    doesn't verify the signature, so any symmetric secret works."""
+    """HS256 JWT with the given ``exp`` offset from now. ``is_logged_in`` decodes
+    with ``verify_signature=False``, so any symmetric secret works."""
     return jwt.encode({"exp": int(time.time()) + exp_offset_seconds}, "test-secret", algorithm="HS256")
 
 
