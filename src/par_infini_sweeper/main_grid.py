@@ -124,7 +124,13 @@ class MainGrid(Widget, can_focus=True):
     def handle_click(self, event: MouseDown | MouseUp, x: int, y: int) -> None:
         """
         Handle a click event by converting the event position to a global cell coordinate.
-        Left-click reveals a cell; middle-click toggles a mark.
+        A plain left-click reveals a cell; any other click (right-click, middle-click,
+        or Shift/Ctrl+left-click) toggles a mine mark.
+
+        Right/middle-click is the primary flagging path: Shift and Ctrl modifiers are
+        unreliable in terminals (Shift is reserved for the text-selection override and
+        some terminals don't report Ctrl on mouse events), but non-left buttons are
+        delivered consistently, so flagging works in every terminal.
 
         Args:
             event (MouseDown | MouseUp): The mouse event (for button / modifier state).
@@ -137,7 +143,7 @@ class MainGrid(Widget, can_focus=True):
         if event.button == 1 and not (event.shift or event.ctrl):
             self.game_state.reveal_cell(gx, gy)
             self.game_state.first_click = False
-        elif event.button == 1 and (event.shift or event.ctrl):
+        else:
             self.game_state.toggle_mark(gx, gy, True)
 
     def adjust_mouse_pos(self, event: MouseEvent) -> GridPos:
