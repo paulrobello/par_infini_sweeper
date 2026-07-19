@@ -127,3 +127,58 @@ async def test_right_click_flags_covered_cell() -> None:
             app.stop_webserver()
         except Exception:  # pragma: no cover — best-effort cleanup
             pass
+
+
+@pytest.mark.asyncio
+async def test_flag_key_flags_hovered_cell() -> None:
+    """The 'f' key flags the cell currently under the mouse cursor — the
+    terminal-independent flagging path. Works in every terminal on every OS
+    because a keypress is always delivered, unlike mouse modifiers."""
+    from par_infini_sweeper.pim_app import PimApp
+
+    app = PimApp(user_name="flagkey_reg")
+    try:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            grid = app.sweeper_widget
+            state = app.game_state
+            assert grid is not None and state is not None
+
+            state.reveal_cell(0, 0)
+            await pilot.pause()
+            origin = state.subgrids.get((0, 0))
+            assert origin is not None
+
+            target_coord = None
+            for ly, row in enumerate(origin.cells):
+                for lx, cell in enumerate(row):
+                    if not cell.uncovered and not cell.is_mine:
+                        target_coord = (lx, ly)
+                        break
+                if target_coord is not None:
+                    break
+            assert target_coord is not None
+            cgx, cgy = target_coord
+
+            pad_w = grid.styles.padding.width
+            pad_h = grid.styles.padding.height
+            ox = (cgx - state.offset.x) * 2 + pad_w + 1
+            oy = (cgy - state.offset.y) + pad_h + 1
+
+            target_cell = state.global_to_cell(cgx, cgy)
+            assert target_cell is not None and not target_cell.marked
+
+            # Hover the cell so mouse_global_grid_coord tracks it, then press F.
+            await pilot.hover(grid, offset=(ox, oy))
+            await pilot.pause()
+            assert state.mouse_global_grid_coord == (cgx, cgy)
+
+            await pilot.press("f")
+            await pilot.pause()
+
+            assert target_cell.marked is True, "pressing 'f' should flag the hovered cell"
+    finally:
+        try:
+            app.stop_webserver()
+        except Exception:  # pragma: no cover — best-effort cleanup
+            pass

@@ -46,7 +46,7 @@ Use this information to determine which cells are safe to uncover.
 
 * Left click to uncover a cell. If a cell is flagged as a mine, it will not be uncovered.
 * Sub grids can only be unlocked when cells neighboring the sub grid are uncovered.
-* Right-click (or Shift/Ctrl + Left-click) to toggle flagging a covered cell as a mine.
+* Press **F** (or Right-click / Shift/Ctrl + Left-click) to toggle flagging a covered cell as a mine.
 * Right-click (or Shift/Ctrl + Left-click) on an uncovered cell to uncover all neighboring cells.
   * As a safety you must have same number of flags as mines in the neighboring cells.
 * Drag to pan the board.

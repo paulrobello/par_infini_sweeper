@@ -17,6 +17,7 @@ class MainGrid(Widget, can_focus=True):
     """Widget that renders the infinite minesweeper grid and handles mouse interactions."""
 
     BINDINGS = [
+        Binding(key="f", action="flag", description="Flag"),
         Binding(key="o", action="origin", description="Origin"),
         Binding(key="c", action="center", description="Center", show=False),
         Binding(key="d", action="debug", description="Debug", show=False),
@@ -114,6 +115,18 @@ class MainGrid(Widget, can_focus=True):
         """Toggle the x-ray mode for the game."""
         self.game_state.xray = not self.game_state.xray
         self.refresh()
+
+    def action_flag(self) -> None:
+        """Toggle the mine flag on the cell currently under the mouse cursor.
+
+        Keyboard flagging works in every terminal on every OS, unlike
+        Shift/Ctrl+click (terminals reserve Shift for text selection and may
+        not report Ctrl) and unlike right-click (some terminals bind it to a
+        context menu/paste). ``mouse_global_grid_coord`` is updated on every
+        mouse move, so this flags whatever cell the cursor is hovering.
+        """
+        gx, gy = self.game_state.mouse_global_grid_coord
+        self.game_state.toggle_mark(gx, gy, True)
 
     @work
     async def action_pause(self) -> None:
