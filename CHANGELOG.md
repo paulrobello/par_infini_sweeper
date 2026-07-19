@@ -7,11 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-This section summarizes an in-progress audit remediation (`AUDIT.md`). The version number has not been bumped — that is a release decision.
+### Added
+
+- Nothing yet.
+
+## [0.4.0] - 2026-07-18
+
+Audit remediation (security, correctness, architecture, code quality, documentation) plus cross-platform cell flagging.
 
 ### Added
 
-- `pytest` + `pytest-asyncio` test harness with 36 tests covering the regression bugs below, `SubGrid` generation, flood-fill, scoring, save/load round-trips, nickname validation, and DB migrations. `make test` and CI now actually run tests.
+- **F key** to flag the cell under the mouse cursor, and **right-click** to flag a covered cell — terminal-independent flagging. Shift/Ctrl+click flagging was unreliable because terminals reserve Shift for text selection and don't always report Ctrl on mouse events; right-click works in most modern terminals and the F key works in every terminal on every OS.
+- `pytest` + `pytest-asyncio` test harness with 39 tests covering the regression bugs below, `SubGrid` generation, flood-fill, scoring, save/load round-trips, nickname validation, DB migrations, and the full mouse/flagging pipeline. `make test` and CI now actually run tests.
 - `docs/CONFIGURATION.md` documenting `PIM_LEADERBOARD_URL`, `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, and `USER`.
 - `CHANGELOG.md` (this file), migrated from the inline README history with duplicates and typos corrected.
 - PKCE (`code_verifier` / `code_challenge=S256`) to the OAuth2 authorization-code flow (SEC-001).
