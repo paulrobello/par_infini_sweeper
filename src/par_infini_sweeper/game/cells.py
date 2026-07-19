@@ -17,9 +17,23 @@ if TYPE_CHECKING:
 
 
 class Cell:
-    """Represents a single cell in a subgrid."""
+    """Represents a single cell in a subgrid.
+
+    Carries the mine / flag / uncovered / highlighted bits plus a ``changed``
+    dirty flag that propagates up to its parent ``SubGrid`` (and from there to
+    ``GameState.changed_subgrids``) so the incremental save only writes
+    subgrids that actually mutated.
+    """
 
     def __init__(self, parent: SubGrid, is_mine: bool, marked: bool = False, uncovered: bool = False) -> None:
+        """Initialize a cell.
+
+        Args:
+            parent: The ``SubGrid`` that owns this cell.
+            is_mine: Whether this cell hides a mine.
+            marked: Whether the player has flagged this cell as a mine.
+            uncovered: Whether this cell has already been revealed.
+        """
         self._parent = parent
         self._is_mine: bool = is_mine
         self._marked: bool = marked
@@ -29,6 +43,7 @@ class Cell:
 
     @property
     def is_mine(self) -> bool:
+        """Return whether this cell hides a mine. Setting it marks the cell dirty."""
         return self._is_mine
 
     @is_mine.setter
@@ -39,6 +54,7 @@ class Cell:
 
     @property
     def marked(self) -> bool:
+        """Return whether the cell is flagged. Setting it marks the cell dirty."""
         return self._marked
 
     @marked.setter
@@ -49,6 +65,7 @@ class Cell:
 
     @property
     def uncovered(self) -> bool:
+        """Return whether the cell has been revealed. Setting it marks the cell dirty."""
         return self._uncovered
 
     @uncovered.setter
@@ -59,6 +76,13 @@ class Cell:
 
     @property
     def highlighted(self) -> bool:
+        """Return whether the cell is currently mouse-hover-highlighted.
+
+        Setting it adds/removes the cell from
+        ``GameState.highlighted_cells`` via ``self.parent.parent`` — this is
+        the ``Cell → SubGrid → GameState`` path the dirty-flag system does
+        not cover, because highlight state is transient and not persisted.
+        """
         return self._highlighted
 
     @highlighted.setter
@@ -71,10 +95,12 @@ class Cell:
 
     @property
     def parent(self) -> SubGrid:
+        """Return the ``SubGrid`` that owns this cell."""
         return self._parent
 
     @property
     def changed(self) -> bool:
+        """Return the dirty flag. Setting to ``True`` propagates up to the parent ``SubGrid``."""
         return self._changed
 
     @changed.setter

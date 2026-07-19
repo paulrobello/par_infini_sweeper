@@ -1,3 +1,20 @@
+"""SQLite schema, connection, and user/highscore queries.
+
+Owns the DB file layout (XDG data dir), the schema ``CREATE TABLE`` statements
+(``init_db``), the forward-only migration chain (``db_migrations``), the
+single-row ``users`` reconstruction in ``get_user`` (prefs + game +
+highscores), and the leaderboard fetch in ``get_internet_highscores``.
+
+Side-effect history (ARC-006 / ARC-007): the legacy rename, mkdir, and backup
+checks previously ran at import time AND inside every ``get_db_connection``
+call. They now live in ``init_storage`` / ``ensure_backup``, invoked once at
+app startup (``PimApp.on_mount``). Importing this module performs only pure
+``Path`` math; no filesystem mutation.
+
+See ``docs/ARCHITECTURE.md#sqlite-schema-and-migrations`` for the schema and
+migration story.
+"""
+
 import base64
 import os
 import sqlite3
@@ -350,6 +367,22 @@ def get_highscores(num_scores: int = 10) -> dict[GameMode, list[dict[str, Any]]]
 
 
 def get_internet_highscores() -> dict[GameMode, list[ScoreData]]:
+    """Fetch the global leaderboard from the leaderboard service, grouped by mode.
+
+    Performs an unauthenticated GET (the public anti-bot ``api-key`` header is
+    attached for naive-bot deterrence only — real authorization is enforced
+    server-side) against ``$PIM_LEADERBOARD_URL/score`` with a 5-second timeout.
+
+    Returns:
+        dict[GameMode, list[ScoreData]]: Every returned score bucketed by its
+        ``GameMode``. Modes with no scores map to an empty list; the dict
+        always contains a key for every member of ``GameMode``.
+
+    Raises:
+        Exception: If the server returns a ``detail`` field, or if the
+            response's ``status`` is ``"error"`` (with the server-supplied
+            message).
+    """
     ret: dict[GameMode, list[ScoreData]] = {}
     for mode in GameMode:
         ret[mode] = []

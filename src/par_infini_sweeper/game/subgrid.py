@@ -45,10 +45,12 @@ class SubGrid:
 
     @property
     def parent(self) -> GameState:
+        """Return the ``GameState`` that owns this subgrid."""
         return self._parent
 
     @property
     def changed(self) -> bool:
+        """Return the dirty flag. Setting to ``True`` adds this subgrid to ``GameState.changed_subgrids``."""
         return self._changed
 
     @changed.setter

@@ -1,3 +1,29 @@
+"""OAuth2 / Auth0 PKCE flow + loopback callback server.
+
+Implements the Authorization Code flow with PKCE (RFC 7636) against an Auth0
+tenant, including the loopback HTTP listener that receives the authorization
+code redirect and exchanges it for tokens. Used by ``GameState.auth_client``
+via ``build_auth_client``.
+
+Design points (see ``docs/ARCHITECTURE.md#oauth2--auth0-flow`` for the full
+sequence diagram):
+
+* PKCE ``code_verifier`` is generated per login and passed to both
+  ``create_authorization_url`` (derives ``code_challenge = S256``) and
+  ``fetch_token`` (redeems it).
+* Loopback listener binds to ``127.0.0.1:1999`` with ``SO_REUSEADDR`` so a
+  previous process leaving the socket in ``TIME_WAIT`` does not block the
+  next launch.
+* ``LOOPBACK_AUTHORITY`` is pinned (never reflected from the request ``Host``
+  header) so a forged Host cannot inject authority into
+  ``parse_authorization_code_response``.
+* Callback errors return a generic ``"Authentication failed"`` body; raw
+  exception text is logged locally only (SEC-003).
+* ``AUTH0_DOMAIN`` / ``AUTH0_CLIENT_ID`` can be overridden via env for local
+  development against a test tenant; if ``AUTH0_CLIENT_ID`` is unset,
+  ``warn_if_default_auth0_client_id`` prints a one-time stderr warning.
+"""
+
 from __future__ import annotations
 
 import http.server
@@ -128,6 +154,31 @@ def build_auth_client(user: dict[str, Any], app: App) -> OAuth2Session:
 
 
 def start_auth_server(client: OAuth2Session, user: dict[str, Any], app: App) -> OAuth2Session:
+    """Run the interactive OAuth login: open browser, serve loopback callback, redeem code.
+
+    Generates a per-login PKCE ``code_verifier``, opens the user's browser at
+    the Auth0 authorize endpoint, and serves a one-shot HTTP listener on
+    ``127.0.0.1:{OAUTH_CALLBACK_PORT}`` that receives the redirect, exchanges
+    the authorization code for tokens (passing the same ``code_verifier``),
+    and persists them via ``db.save_user``. On callback errors (OAuth2Error,
+    transport failure) the response body is a generic ``"Authentication failed"``
+    and the raw exception is logged locally only.
+
+    Args:
+        client: The ``OAuth2Session`` to authorize (its ``client_id`` /
+            ``redirect_uri`` / ``scope`` were configured by ``build_auth_client``).
+        user: User dict to receive the ``id_token`` / ``access_token`` /
+            ``refresh_token`` / ``expires_at`` columns. Mutated in place and
+            persisted to the DB on success.
+        app: The Textual app, used to post ``ShowURL`` (if the browser fails
+            to open), ``WebServerStarted``, ``WebServerStopped``, and
+            ``AuthServerError`` (if the loopback port cannot be bound).
+
+    Returns:
+        The original ``client`` (now populated with tokens). The same object
+        reference is returned on success and on callback failure — callers
+        should check ``client.token`` before treating the session as valid.
+    """
     # PKCE: this is a public native/desktop client, so RFC 7636 code_verifier is
     # mandatory. Generate once here; the same value is passed to both
     # create_authorization_url (which derives code_challenge=S256) and fetch_token

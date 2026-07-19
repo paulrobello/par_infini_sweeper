@@ -63,6 +63,19 @@ class GameState:
     """Represents the overall game state including difficulty and all subgrids."""
 
     def __init__(self, parent: Widget | None, user: dict[str, Any]) -> None:
+        """Initialize game state for a loaded user.
+
+        Args:
+            parent: The owning Textual widget (``MainGrid``) used for
+                ``notify`` / ``refresh`` calls, or ``None`` for headless tests.
+                See ``GameState.parent`` and the model↔UI coupling note in the
+                module docstring — this bridge is intentional pending a
+                Message-based decoupling.
+            user: User row dict from ``db.get_user`` (or the load path's
+                ``init_db`` fallback). Must carry ``prefs``, ``game``, and the
+                OAuth token columns; the dict is held by reference and mutated
+                in place by ``save_user`` / leaderboard helpers.
+        """
         self.parent = parent
         self.mode: GameMode = GameMode.INFINITE
         self.user: dict[str, Any] = user
@@ -149,6 +162,18 @@ class GameState:
 
     @property
     def auth_client(self) -> OAuth2Session:
+        """Return an authenticated ``OAuth2Session``, building/refreshing it on demand.
+
+        If the cached session is missing or the access token is no longer valid,
+                this rebuilds it via ``build_auth_client`` (which transparently
+                refreshes the token if a ``refresh_token`` is available, or starts
+                the interactive OAuth loopback login flow otherwise).
+
+        Raises:
+            RuntimeError: If ``self.parent`` is ``None`` or has no running app
+                (the OAuth flow needs the app to post ``ShowURL`` /
+                ``WebServerStarted`` / ``WebServerStopped`` messages).
+        """
         if not self._auth_client or not self.is_logged_in():
             # QA-007: parent + app are required to build the OAuth session; raise
             # rather than assert so the check survives ``python -O``.
@@ -210,13 +235,19 @@ class GameState:
             nickname (str): New nickname to set.
 
         Returns:
-            PostScoreResult: Result of the post operation.
+            ChangeNicknameResponse: Result of the change operation.
         """
         # ARC-004: HTTP/nickname logic moved to leaderboard.change_internet_nickname.
         return change_internet_nickname(self, nickname)
 
     def new_game(self) -> None:
-        """Start a new game by resetting the game state."""
+        """Start a new game by resetting the game state.
+
+        Clears all subgrids back to a single fresh ``(0, 0)`` subgrid, resets
+        score / duration / game_over / first_click / highlight state, deletes
+        the persisted ``grids`` rows for the current user, and saves the fresh
+        state. Existing OAuth tokens and user preferences are preserved.
+        """
 
         sg = SubGrid(self, (0, 0), self.difficulty)
         sg.changed = True
@@ -266,10 +297,12 @@ class GameState:
 
     @property
     def num_changed(self) -> int:
+        """Return the count of subgrids currently marked dirty (pending save)."""
         return sum(1 for sg in self.subgrids.values() if sg.changed)
 
     @property
     def num_subgrids(self) -> int:
+        """Return the total number of subgrids in the game (solved + unsolved)."""
         return len(self.subgrids)
 
     @staticmethod
@@ -732,8 +765,7 @@ class GameState:
     def post_internet_score(self) -> PostScoreResult:
         """
         Post score to the internet leaderboard.
-        Args:
-            game_state (GameState): Game state containing user and score data.
+
         Returns:
             PostScoreResult: Result of the post operation.
         """
